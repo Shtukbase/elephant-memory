@@ -1,0 +1,80 @@
+{
+  "name": "dsh-elephant-memory",
+  "version": "0.1.0",
+  "description": "Elephant Memory: your DeepSeek agent never forgets. An endless memory for the DeepSeek harness: the agent keeps every chat it has in a project and reads all of it at every turn through a fixed-size set of summary lines (after Victor Taelin's OptChat specification).",
+  "license": "MIT",
+  "author": "Shtukbase",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shtukbase/elephant-memory.git"
+  },
+  "homepage": "https://github.com/Shtukbase/elephant-memory#readme",
+  "bugs": {
+    "url": "https://github.com/Shtukbase/elephant-memory/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "agent",
+    "memory",
+    "long-term-memory",
+    "context-window",
+    "llm",
+    "endless-memory"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./presets/*.patch.yml": "./presets/*.patch.yml"
+  },
+  "files": [
+    "lib/*.js",
+    "presets/endless.patch.yml",
+    "assets/elephant.png",
+    "README.md",
+    "SEAMS.md",
+    "TRY.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "manifestVersion": 1,
+    "client": {
+      "platform": "web",
+      "inject": []
+    },
+    "bundle": {
+      "patch": [
+        "./presets/endless.patch.yml"
+      ]
+    }
+  },
+  "//peerDependencies": "Every harness package this plugin imports. The harness checks the @deepseek-ai/dsh-* ranges at install and at every start, and resolves the imports to its own installation; profiles set autoInstallPeers: false. They are optional so a workspace install never fetches a second copy (SEAMS.md, item 10-11 of the recheck list).",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-compaction": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-home-paths": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-compaction": { "optional": true },
+    "@deepseek-ai/dsh-home-paths": { "optional": true },
+    "@deepseek-ai/dsh-llm": { "optional": true },
+    "@deepseek-ai/dsh-tools": { "optional": true },
+    "@deepseek-ai/schemastery": { "optional": true }
+  },
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.0-rc.2 <0.3.0-0"
+  },
+  "scripts": {
+    "build": "node scripts/build-client.js",
+    "prepack": "node scripts/build-client.js",
+    "test": "node --test --test-timeout=20000 --test-force-exit \"test/*.test.js\""
+  }
+}

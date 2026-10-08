@@ -1,0 +1,166 @@
+# The Endless preset (display name "endless" in the harness's mode list) and the
+# plugin's browser half, both inserted by this package's bundle patch
+# (package.json `dsh.bundle.patch`).
+#
+# 1. `preset-endless`: one `@deepseek-ai/dsh-agent-preset` declaration. It is the
+#    harness's Creator mode (the `cordis` preset,
+#    `@deepseek-ai/dsh-web-app/presets/cordis.patch.yml`, read at 0.2.0-rc.2) with
+#    five changes:
+#
+#    a. The `compaction` group is replaced by the `endless` group: this plugin's
+#       compaction service, isolated so it never leaks to other presets. The
+#       shipped backend, `/compact` and the tool-result pruner are left out: the
+#       history is replaced by the memory view at every turn start instead.
+#    b. `skill-filesystem` omits Creator's preset-authoring skill directory. That
+#       row resolves the directory from the declaring bundle's own location
+#       (`createRequire(baseUrl)`), which for this bundle is the profile, not the
+#       harness installation; it was not proven to resolve there.
+#    c. No `persona` row (`@deepseek-ai/dsh-persona`): the persona is the
+#       deployment's own, the `system-prompt` row's, so a host that sets it is
+#       not shadowed by "You are a coding agent".
+#    d. No `tool-plugin-manager` row: the assistant never installs or removes
+#       packages on its own.
+#    e. No `planning` group (plan mode): its section is the harness's own prompt
+#       policy, whose only authority is the harness's preset file; a copy here
+#       would drift the day it changes.
+#
+#    To change the plugin's config, restate this whole row (without `insert:`)
+#    in the profile's `cordis.patch.yml`: a patch replaces a row's complete
+#    config. A host that composes its own profile may do the same to add
+#    `contextKinds`.
+#
+# 2. `endless-client`: the plugin's browser half, mounted at the top of the
+#    profile. The harness serves a plugin's browser bundle only for a plugin
+#    mounted there, not for one mounted inside a preset (SEAMS.md, "The browser
+#    half"), so the preset's row cannot carry it. The row is a path relative to
+#    this patch file (the harness resolves a bundle's rows from the patch's own
+#    folder), so it finds the package wherever it is installed; its file has no
+#    server half. A host with its own interface turns the row off with
+#    `disabled: true` (it keeps the preset).
+- insert:
+    - id: endless-client
+      name: ../lib/client-host.js
+    - id: preset-endless
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: endless
+        name: Endless
+        description: >-
+          Creator's tools with a memory of every chat this agent has had in this
+          project: every word kept, and each turn reads the whole history through
+          a fixed-size set of summary lines.
+        order: 5
+        plugins:
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: endless
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+            config:
+              - id: endless-memory
+                name: dsh-elephant-memory
+                config:
+                  agentName: Assistant
+                  you: you
+                  viewBytes: 128000
+                  viewFloorBytes: 64000
+                  lineBytes: 512
+                  granularity: turn
+                  writer:
+                    model: ''
+                    reasoningEffort: 'off'
+                  recallSearch: true
+                  root: ''
+                  contextKinds: []
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+                  backgroundMode: continuable
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+                  backgroundMode: continuable
+              - id: tool-subagent-codex
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: codex
+                  toolName: subagent_codex
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+              - id: tool-subagent-claude-code
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: claude-code
+                  toolName: subagent_claude_code
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+              - id: tool-ralph
+                name: '@deepseek-ai/dsh-tool-ralph'
+                disabled: true
+                config:
+                  subagentProvider: spawn
+                  maxRounds: 64
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: tool-cordis
+            name: '@deepseek-ai/dsh-tool-cordis'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'

@@ -1,0 +1,41 @@
+# CI for this package when it stands alone in its own repository. Inside a
+# larger repository this file is inert: GitHub reads workflows only from the
+# repository root's .github folder, so it travels with the package folder and
+# starts working the day the folder is split out.
+#
+# The package has no dependencies of its own. The harness's packages are peers
+# and the tests import them, so they are installed here, outside package.json,
+# at the versions `peerDependencies` names as the tested floor.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install the harness peers
+        run: >-
+          npm install --no-save --no-package-lock --no-audit --no-fund
+          @deepseek-ai/dsh-compaction@0.2.0-rc.2
+          @deepseek-ai/dsh-home-paths@0.2.0-rc.2
+          @deepseek-ai/dsh-llm@0.2.0-rc.2
+          @deepseek-ai/dsh-tools@0.2.0-rc.2
+          @deepseek-ai/schemastery@^3.18.4
+      - name: The browser bundle is what its sources make
+        run: node scripts/build-client.js --check
+      - name: Tests
+        run: node --test --test-timeout=20000 --test-force-exit test/*.test.js
