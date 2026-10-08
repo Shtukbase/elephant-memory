@@ -4,6 +4,8 @@
 
 **Your DeepSeek agent never forgets.**
 
+[![npm](https://img.shields.io/npm/v/dsh-elephant-memory)](https://www.npmjs.com/package/dsh-elephant-memory)
+[![test](https://github.com/Shtukbase/elephant-memory/actions/workflows/test.yml/badge.svg)](https://github.com/Shtukbase/elephant-memory/actions/workflows/test.yml)
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![node >= 22](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
 ![DeepSeek harness 0.2.x](https://img.shields.io/badge/DeepSeek%20harness-0.2.x-4D6BFE)
