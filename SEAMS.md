@@ -170,12 +170,21 @@ and reconciling the system prompt at the head (`SystemPromptProjection`,
 the request messages to equal `session.deriveMessages()`, which is why the
 log is the only legal place to change them.
 
-**Rejecting loses nothing durable but drops the claim.** On `reject` the turn
-ends `blocked` (`:958-961`) and the claimed messages are not appended. They
-stay in the log as the `agent/inbox/spliced` that queued them
-(`ReactLoopInbox.claim`, `:103-111`). Endless puts them back with
-`agent.inject(message)` (`:812-814`, next-step, no wake), so the next turn
-delivers them.
+**Refusing loses nothing durable but drops the claim.** A step that is not
+taken leaves the claimed messages unappended. They stay in the log as the
+`agent/inbox/spliced` that queued them (`ReactLoopInbox.claim`, `:103-111`).
+Endless puts them back with `agent.inject(message)` (`:812-814`, next-step, no
+wake), so the next turn delivers them, and then THROWS one plain sentence
+instead of returning `reject`. On `reject` the turn ends `blocked`
+(`:958-961`), which the web UI drew as "Completed in 3m 0s" with nothing said
+(round-4 live walk, F5); a throw ends it `{ kind: 'error' }` (`:1012-1024`),
+drawn as the chat's refusal line, and `kick` contains it (`:887-891`). The
+messages go back without `source.rpcId`: the web UI keeps a person's pending
+copy while an inbox insertion carries its submission id
+(`dsh-api-session-controller/lib/types/client/sessions/session.js:704-716`,
+`observeSubmissionInsertions`) and settles it at `turn/end` once the claim
+removed it (`:700-703`), so with the id the copy was drawn as still starting
+for as long as the chat was open.
 
 **The runtime-context snapshot must stay visible.** `RuntimeContextProjection`
 (`:298-350`) decides before the waterfall whether to add a fresh snapshot, and
@@ -383,12 +392,36 @@ compaction reads the tools and the system prompt from the turns' cache. The
 compaction instructions are in the plugin's system section for that reason. No
 `toolChoice` exists in `GenerateOptions`; the section tells the writer to call
 no tool, and a reply with no text is a failed try. A memory with no live chat
-falls back to the plugin's section as `system`.
+falls back to the plugin's section as `system`. A chat on its first turn has
+no `system/message` yet while its step-1 listener waits (the loop writes it in
+`step()`, after the waterfall, `$H/dsh-agent-loop/lib/index.js:1051-1060`), so
+the registry reads the newest other chat of the same memory that has one
+(`prefixOfChats`, `lib/registry.js`). The round-4 stand's first writer calls
+went out with `tools=0` for exactly that reason, not because of the adapter.
 
 **Reasoning effort.** The DeepSeek adapter accepts `off`, `low`, `high` and
 `max` and thinks at `high` when none is sent
 (`$H/dsh-llm-deepseek/lib/index.js:313-318`, `:1694-1700`); `off` disables
-thinking. The writer sends `off` unless `writer.reasoningEffort` names another.
+thinking. The writer wants `off` unless `writer.reasoningEffort` names another,
+and sends only what the model declares: `ctx.llm.resolveModelInfo(provider,
+model)` answers `reasoning.efforts` (`$H/dsh-llm/lib/index.js:2098-2150`), and
+`resolveCallWithInfo` (`:2163-2185`) refuses any effort a model does not
+declare, and any effort at all for a model with no `reasoning`, before the
+request leaves. A `dsh-llm-pi-ai` model row with no `reasoningEfforts` and no
+installed catalogue entry has no `reasoning` (`reasoningInfo`,
+`$H/dsh-llm-pi-ai/lib/index.js:1711-1729`). So the writer sends the wanted
+effort where declared, else `off`, else the lowest declared, else none.
+
+**The writer's route.** `agent.options` hold the route the agent was created
+with and never change. The route a turn's request uses comes from the session
+controller's model selection (`selectionFor`,
+`$H/dsh-api-session-controller/lib/index.js:281-312`): the person's pick not yet
+used, else the logged request header, applied through `system-prompt/assemble`
+and `agent/request` (`$H/dsh-agent/lib/index.js:166-192`). The same two facts
+are the public `modelSelection` session projection (`pending`, `lastUsed`,
+`:2066-2090`), read with `ctx.sessionProjections.stateOf`. Endless reads that
+projection, then `session.requestHeader().config`, then `agent.options`
+(`routeOfTurn`, `lib/guard.js`), for the model guard and the writer.
 
 **Logging.** `ctx.logger` has only a ring-buffer exporter at run time
 (`$H/cordis/lib/index.js:588-605`); the boot's exporter keeps startup

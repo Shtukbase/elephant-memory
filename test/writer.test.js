@@ -6,6 +6,7 @@
 // when none fits; a try in a script its sources do not use is invalid.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { KEEP } from '../lib/prompts.js';
 import { stripHeads } from '../lib/text.js';
 import { PLACEHOLDER, View } from '../lib/view.js';
 import { Writer } from '../lib/writer.js';
@@ -139,6 +140,7 @@ test('the compress task is the spec\'s, with a ruler of the limit in dashes and 
 (about 70 words), the length of this ruler:
 ${'-'.repeat(512)}
 Write the line in the language of the messages it summarizes.
+${KEEP}
 <input>
 Assistant: ${'y'.repeat(700)}
 </input>`);
@@ -160,6 +162,7 @@ test('a merge starts once both halves are built; its task names the lines and it
 512 bytes (about 70 words), the length of this ruler:
 ${'-'.repeat(512)}
 Write the line in the language of the messages it summarizes.
+${KEEP}
 <chat> may hold their messages, 2 to 3, in more detail: take details
 of them from there too.
 Use only facts present in the lines being merged and in those messages.

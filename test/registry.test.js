@@ -180,3 +180,30 @@ test('an agent\'s replies are tagged with its own name: the display name a bind 
   assert.throws(() => memories.bind('chat-x', SCOUT, BOARD, 'Two: words'), /not readable/);
   memories.closeAll();
 });
+
+// Round 4 live walk, F6: a chat's first turn notes the route before the harness
+// has written that chat's system prompt, and its summary calls went out with
+// the plugin's own section and no tools while the other chat's carried 57.
+test('until a chat has its own system prompt, the writer reads the newest other chat\'s, then its own', () => {
+  const { memories } = registry();
+  memories.bind('chat-a', SCOUT, BOARD);
+  memories.bind('chat-b', SCOUT, BOARD);
+  const a = chat(memories, 'chat-a');
+  const memory = memories.attach(a);
+  memories.attach(chat(memories, 'chat-b'));
+  const ofA = { system: { role: 'system', content: [] }, tools: [{ name: 'zoom' }] };
+  /** @type {any} */
+  let ofB = {};
+  memories.noteRoute(memory.memoryId, { provider: 'p', model: 'm', sessionId: 'chat-a', prefix: () => ofA });
+  memories.noteRoute(memory.memoryId, { provider: 'p', model: 'm2', sessionId: 'chat-b', prefix: () => ofB });
+  const route = /** @type {any} */ (memories.routeOf(memory.memoryId));
+  assert.deepEqual({ provider: route.provider, model: route.model, sessionId: route.sessionId }, { provider: 'p', model: 'm2', sessionId: 'chat-b' });
+  assert.equal(route.prefix(), ofA, 'a chat with no system prompt yet sent none, while another chat of the memory has one');
+  ofB = { system: { role: 'system', content: [{ type: 'text', text: 'B' }] }, tools: [] };
+  assert.equal(route.prefix(), ofB, 'a chat with its own system prompt did not send it');
+  // A chat that went away gives nothing.
+  ofB = {};
+  memories.detach('chat-a');
+  assert.deepEqual(route.prefix(), {});
+  memories.closeAll();
+});

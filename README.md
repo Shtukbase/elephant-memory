@@ -66,7 +66,9 @@ replace that with this list, or add the item to the list already there:
 ## Set up a model
 
 The memory uses the chat's own model: whichever model and provider the session
-runs also write its summaries. The model's context window must be at least
+runs also write its summaries. When you switch provider or model in the
+composer, the summaries follow at the next turn: the writer uses the route that
+turn's own request uses, not the one the chat was created on. The model's context window must be at least
 65,536 tokens.
 
 1. **DeepSeek's official API** works out of the box: give the harness your key
@@ -106,8 +108,11 @@ runs also write its summaries. The model's context window must be at least
    `apiKeyEnv` names a credential, never the key itself: set it in the
    environment, or in `$DSH_HOME/.credentials.yaml` (`version: 1`, then
    `refs:` with `OPENCODE_GO_API_KEY: "<your key>"`, file mode 0600). The empty
-   `off:` level lets the summary writer turn thinking off (deviation 13); a
-   declared model without it would think on every summary.
+   `off:` level lets the summary writer turn thinking off (deviation 13). A
+   declared model without it still works: the writer reads the efforts the
+   model declares and asks for the lowest one, or for none when the model
+   declares no reasoning at all, and logs that once. Such a model may think on
+   every summary, which costs output tokens.
 
 ## How memory is keyed
 
@@ -199,7 +204,7 @@ row. A patch replaces a row's whole `config`, so keep every key.
 | `lineBytes` | `512` | The target size of one summary line, in bytes. |
 | `granularity` | `turn` | `turn` keeps one trace message per turn; `step` keeps every tool call and result as its own message (deviation 1). |
 | `writer.model` | `''` | Another model **of the chat's own provider** for writing summaries; empty means the chat's model. A `writer.provider` key is refused. |
-| `writer.reasoningEffort` | `'off'` | Reasoning effort for summary calls (deviation 13). Empty means `off`. |
+| `writer.reasoningEffort` | `'off'` | Reasoning effort for summary calls (deviation 13). Empty means `off`. A level the chat's model does not declare falls back to `off`, else the lowest it declares, else none, logged once. |
 | `recallSearch` | `true` | Offer the `recall_search` tool. |
 | `root` | `''` | The folder that holds the memories; empty means `$DSH_HOME/endless`. |
 | `contextKinds` | `[]` | Message kinds of a host's own standing context, kept in front of the summary like the harness's own context messages. |
@@ -231,8 +236,13 @@ place of** its `compaction` group (a preset has one compaction service):
 3. **One cache miss per batch.** The first turn after a merge batch misses the
    cache from the first merged line on. That is the cost of the design.
 4. **A turn can be refused.** If summary lines are still missing after 180 s,
-   the turn is refused and its messages wait for the next turn. Nothing is sent
-   without the summary, and nothing goes to another provider.
+   the turn ends with one sentence in the chat's refusal line: "The memory of
+   earlier messages is not ready yet, so this message will be sent with your
+   next one." Its messages wait in the chat's queue and go with your next
+   message; the chat stays usable. This happens the same way when the writer is
+   slow and when it fails at once on every try. Nothing is sent without the
+   summary, and nothing goes to another provider. Why it was refused is in the
+   log (`[ENDLESS_TURN]`, and the writer's `[ENDLESS_WRITER]` lines).
 5. **Everything is kept.** The memory holds every word of every turn, including
    anything you pasted or a tool printed, as plain files on your disk, and the
    summaries are written by your chat's provider. There is no "forget this" yet:
@@ -250,9 +260,10 @@ place of** its `compaction` group (a preset has one compaction service):
    been tried. Another harness version may need the checks in [`SEAMS.md`](SEAMS.md).
 10. **Providers.** Run on DeepSeek's official API (the 201-turn run) and on
     OpenCode Go's OpenAI-compatible endpoint through `dsh-llm-pi-ai` (the short
-    live check). The writer asks for reasoning effort `off`; on another provider,
-    declare an `off` level (see [Set up a model](#set-up-a-model)) or set
-    `writer.reasoningEffort` to a level the provider accepts.
+    live check). The writer asks for reasoning effort `off` where the model
+    declares it, else for the lowest effort the model declares, else for none
+    (deviation 13). To keep summaries cheap on another provider, declare an
+    `off` level (see [Set up a model](#set-up-a-model)).
 11. **The agent decides when to look back.** The prompt tells it that a summary
     line is never anyone's exact words and to open the message before quoting,
     and in the live check it did. Before that sentence was added, the same model
@@ -293,7 +304,12 @@ tour.
    starts once fewer than 8 lines before it are unwritten; a merge starts once
    both halves exist. Each call sends the chat's own system prompt and tools,
    then a smaller view (16-32 KB) for context, then the task with a ruler of
-   512 dashes, because models cannot count bytes.
+   512 dashes, because models cannot count bytes. A chat's first turn has no
+   system prompt yet while it waits (the harness writes it after the wait), so
+   its calls send those of another chat of the same memory. Only a memory with
+   no other open chat, such as the first chat after a restart, sends the
+   plugin's own section and no tools for those first calls; that is the same on
+   every provider.
 
 How it attaches to the harness, with file and line references, is in
 [`SEAMS.md`](SEAMS.md). [`TRY.md`](TRY.md) is a recipe for trying it in an
@@ -330,8 +346,13 @@ Each one has a reason the specification does not already answer.
    writing process per memory is guaranteed by a lock file.
 6. **No `spawn` or `tell`.** Delegation uses the harness's own tools, and
    `zoom("Name")` is not offered.
-7. **A refused turn re-queues its messages**, because the harness drops a
-   refused step's messages otherwise.
+7. **A refused turn re-queues its messages and ends as a failure.** The harness
+   drops a refused step's messages otherwise. The turn ends as a failure with
+   one plain sentence rather than as a rejected step, because the web UI draws
+   a rejected step as a finished turn with nothing said and keeps the person's
+   message drawn as still starting. The re-queued messages carry no submission
+   id, so the web UI settles its pending copy; they are delivered with the next
+   message, and nothing starts a turn by itself.
 8. **No cache marks.** DeepSeek caches by prefix without marks. Providers that
    need explicit marks (Anthropic) get none from this version.
 9. **The view is logged once per turn**, inside the harness's session log. That
@@ -344,10 +365,11 @@ Each one has a reason the specification does not already answer.
     summary calls share, as the specification asks. A 201-turn run once answered
     a person's short message as if it were a summary task, so the section says a
     call is a summary task **only** when its last message starts with
-    "Compaction:". Both tasks add one sentence: write in the language of the
-    messages. The merge task adds another: use only facts present in the lines
-    and their messages, because an earlier prompt's sample line leaked invented
-    facts into real memories.
+    "Compaction:". Both tasks add a sentence to write in the language of the
+    messages and one to keep the person's rules (deviation 18). The merge task
+    adds another: use only facts present in the lines and their messages,
+    because an earlier prompt's sample line leaked invented facts into real
+    memories.
 12. **Three tries, then a trim; a 1.25× tolerance.** The specification allows
     five tries. In the 201-turn run the writer averaged 2.65 calls per line,
     mostly "Too long" retries, and 325 of 1,182 lines were still over 512 bytes
@@ -360,6 +382,11 @@ Each one has a reason the specification does not already answer.
     high effort. On DeepSeek, effort "high" (the adapter's default) produced a
     median 8,800 output tokens per 512-byte line and turns waiting two minutes, so
     the writer asks for `off` unless `writer.reasoningEffort` says otherwise.
+    It asks only for an effort the chat's model declares (the harness's model
+    catalog, `resolveModelInfo`): where the wanted one is not declared it takes
+    `off`, else the lowest declared, else names none, and logs that once per
+    model. Before this, a route whose model declared no `off` refused every
+    summary before it left, and the memory stopped at the first long message.
 14. **The language guard.** In the 201-turn run 6% of the lines were written in
     Chinese from sources with no Chinese text. A try that uses a Chinese,
     Japanese or Korean script its sources do not use is rejected with "Wrong
@@ -389,6 +416,33 @@ Each one has a reason the specification does not already answer.
     stored `625+1|` on its second line (1 of 214 new lines in the 235-turn run).
     A head in the middle of a line is left alone, because it cannot be told from
     the line's own words.
+18. **Both tasks ask to keep what the person states.** Each task adds: "Keep every
+    rule, instruction, decision or preference the person states, word for word
+    where short, before any other detail." The shared instructions already rank the
+    person's own words first ([`lib/system-section.js`](lib/system-section.js)),
+    but the task, which comes last in the conversation, says nothing of it. A
+    real run (round 5 of the live walk, 2026-10-08) compressed a long first
+    message, a rule ("release notes list only what ships") followed by a
+    ten-item checklist, into a line that held the checklist and dropped the
+    rule; the rule survived only in the agent's own memory-write line. The
+    sentence sits after the language sentence and before the input
+    ([`lib/prompts.js`](lib/prompts.js), `KEEP`). It asks and does not guarantee:
+    the line limit still applies, so a very long rule can be shortened.
+19. **The writer reads look-backs in words.** The order file keeps a turn's trace
+    as the harness gave it, and for the memory's own look-back tools that is
+    machine form: `did: zoom {"id":0,"n":1}`, a line head `0+0|`, a search's
+    `id|kind|date|snippet` hits. A writer told to tag items in plain words copied
+    it into real summary lines ("Looked back id 0 n 1", "message 0", "(1, 7, 8)";
+    round 5 of the live walk). The writer, and a short trace's own line in the
+    view, now read `did: looked back at «subject» in «chat»` (a date as `did:
+    looked back at when a message was written: …`; nothing found as `… and found
+    nothing`), made by [`lib/look-back-words.js`](lib/look-back-words.js) from
+    the stored trace, which is not changed: `zoom(id, 1)` still gives it whole,
+    `recall_search` still searches it, and the History view still reads it.
+    Every tool call, these too, keeps the one tag `did:`. Granularity `turn` only:
+    a `step` entry holds a call without its answer. Other tools' own answers are
+    not touched, so an id the harness's own tool prints (`undo-1` from the
+    harness's `memory_add`) can still reach a line.
 
 ## For hosts
 

@@ -85,6 +85,8 @@ test('inline words — a remembered line, a search snippet — lose ids, fields 
   assert.equal(words.plainInline('6|did|Thu, 8 Oct 2026, 13:07|did: grep {"q":"x"} result: hit'), 'Thu, 8 Oct 2026, 13:07 · Searched files · x result: hit');
   assert.equal(words.plainInline('did: zoom {"id":1,"n":1} result: 1+0|in «A», you: hi'), 'Looked back · in «A», you: hi');
   assert.equal(words.plainInline('plain words stay'), 'plain words stay');
+  // The writer reads a look-back as `did: looked back at …` (lib/look-back-words.js); the view shows it as the row does.
+  assert.equal(words.plainInline('did: looked back at «cheese-maker» in «Pricing page»'), 'Looked back at «cheese-maker» in «Pricing page»');
 });
 
 test('days: Today, Yesterday and dated headings, and the feed names a day and a chat where each changes', () => {

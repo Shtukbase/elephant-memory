@@ -4,12 +4,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolveConfig } from '../lib/config.js';
-import { TASK_MARKER, compressTask, mergeTask, retryTask } from '../lib/prompts.js';
+import { KEEP, TASK_MARKER, compressTask, mergeTask, retryTask } from '../lib/prompts.js';
 import { systemSection } from '../lib/system-section.js';
 
 test('the ruler is exactly the line budget in dashes, and the word count scales with it', () => {
   const task = compressTask(7, 'you: hi', 256);
-  assert.equal(task, `Compaction: compress message 7 into one line of at most 256 bytes\n(about 35 words), the length of this ruler:\n${'-'.repeat(256)}\nWrite the line in the language of the messages it summarizes.\n<input>\nyou: hi\n</input>`);
+  assert.equal(task, `Compaction: compress message 7 into one line of at most 256 bytes\n(about 35 words), the length of this ruler:\n${'-'.repeat(256)}\nWrite the line in the language of the messages it summarizes.\n${KEEP}\n<input>\nyou: hi\n</input>`);
 });
 
 test('the view\'s floor is half its ceiling unless set, and must stay under it', () => {
@@ -107,4 +107,20 @@ test('every writer task opens with the marker the section names, and says to wri
     assert.match(task, /\nWrite the line in the language of the messages it summarizes\.\n/);
   }
   assert.ok(systemSection(resolveConfig({})).includes(`task marker, "${TASK_MARKER}",`));
+});
+
+// A live run on 2026-10-08 (round 5): a first message with the rule "release notes list only what
+// ships" and a ten-item checklist became a line holding the checklist alone; the rule survived only
+// in the agent's own memory-write line.
+test('both writer tasks ask to keep every rule, instruction, decision and preference the person states, before any other detail', () => {
+  assert.equal(KEEP, 'Keep every rule, instruction, decision or preference the person states, word for word where short, before any other detail.');
+  const tasks = {
+    compress: compressTask(3, 'you: A', 512),
+    merge: mergeTask({ a: '0+1', b: '1+1', id: 0, end: 1, lineA: '0+1|A', lineB: '1+1|B' }, 512),
+  };
+  for (const [name, task] of Object.entries(tasks)) {
+    // After the instructions, before the data: the model reads the ask before the input it applies to.
+    assert.ok(task.indexOf(KEEP) > 0 && task.indexOf(KEEP) < task.indexOf('<input>'), `${name} task lacks the keep sentence before its input`);
+    assert.equal(task.split(KEEP).length - 1, 1, `${name} task repeats the keep sentence`);
+  }
 });

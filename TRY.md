@@ -230,7 +230,12 @@ A failing line logs `[ENDLESS_WRITER] line l:i failed, retrying every 10 s: …`
 and a trimmed one `[ENDLESS_WRITER] line l:i fit in no try and was trimmed …`.
 With effort `off`, a call writes one or two hundred output tokens; thousands
 mean thinking is on (see the README's [Set up a model](README.md#set-up-a-model)).
-A refused turn logs `[ENDLESS_TURN] … turn refused`. A model below 65,536
+A refused turn logs `[ENDLESS_TURN] … turn refused`, and the chat shows one
+sentence: "The memory of earlier messages is not ready yet, so this message
+will be sent with your next one." The message waits and goes with the next one
+you send. A route whose model does not declare the effort `off` logs
+`[ENDLESS_WRITER] <provider>/<model> does not offer reasoning effort "off"; …`
+once and goes on with the lowest effort it declares, or none. A model below 65,536
 tokens of context logs `[ENDLESS_GUARD] … runs without endless memory` once per
 chat.
 
@@ -273,5 +278,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "http://127.0.0.1:$PORT/api/end
 7. Any file changes outside `$TRIAL`.
 8. A look-back call drawn as `zoom {"id":…}`, a "Context compacted" row in an
    Endless chat, or no **History** entry on the sidebar's start page.
+9. A refused turn drawn as a finished turn with no sentence, or a message still
+   "starting" more than 180 s after it was sent.
+10. `[ENDLESS_WRITER_USAGE]` lines naming another provider than the chat's own
+    after you switched it in the composer and sent a message.
 
 Report each with the copied log lines, never a summary of them.
