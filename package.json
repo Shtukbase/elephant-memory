@@ -1,6 +1,6 @@
 {
   "name": "dsh-elephant-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Elephant Memory: your DeepSeek agent never forgets. An endless memory for the DeepSeek harness: the agent keeps every chat it has in a project and reads all of it at every turn through a fixed-size set of summary lines (after Victor Taelin's OptChat specification).",
   "license": "MIT",
   "author": "Shtukbase",

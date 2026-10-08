@@ -129,8 +129,9 @@ test('the README opens with the logo, the name and the tagline, and has what a s
   for (const needle of ['## Install', 'dsh plugin --profile web add dsh-elephant-memory', '## Choose the Endless preset', '## How memory is keyed', '## History', '## Looking back', '## Cost and cache', '## Configuration', '## Limitations', '## How it works', '### Deviations from the specification', '## Contributing', '## License', 'github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449', 'github.com/Shtukbase/elephant-memory']) {
     assert.ok(readme.includes(needle), needle);
   }
-  // No badge for a CI run or an npm page until the repository and the package exist.
-  assert.doesNotMatch(readme, /actions\/workflows\/.*badge|img\.shields\.io\/npm/);
+  // The repository and the npm package exist (0.1.0 is published): the README carries both badges.
+  assert.match(readme, /img\.shields\.io\/npm\/v\/dsh-elephant-memory/);
+  assert.match(readme, /actions\/workflows\/test\.yml\/badge\.svg/);
 });
 
 test('every configuration key is in the README\'s table, and every deviation the code names is in its list', () => {

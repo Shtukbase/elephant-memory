@@ -144,6 +144,14 @@ folder, and a picker offers any other memory.
    with. Each line opens into the two lines it was made from, down to the exact
    message.
 
+A turn you stop with **Esc** is kept too: your message, whatever the agent
+already said (a reply cut short is kept as far as it went), its tool uses and
+their results so far, then a note that you stopped it. This holds when you stop
+the turn while it is still waiting for the memory, before the agent has said
+anything: your message is kept once, and it is not sent again by itself. A
+turn cut off because the harness stopped running is kept the same way, and
+ends with a note that it was interrupted.
+
 ## Looking back
 
 The agent has three tools for its memory:
@@ -518,6 +526,22 @@ of the harness's client, and the engine against a fake of the harness's session
 and context owners. A real harness is needed to see anything drawn; see
 [`TRY.md`](TRY.md). When the harness changes version, walk the recheck list at
 the end of [`SEAMS.md`](SEAMS.md).
+
+## Changelog
+
+### 0.1.1
+
+1. A turn stopped with Esc is saved to memory: the person's message, what the
+   agent already said, its tool uses with their results so far, and a closing
+   note, "stopped by the person". Before, a turn stopped while it waited for
+   the memory lost the person's message and was not saved at all, and a turn
+   stopped later was saved without saying it had been stopped.
+2. A turn cut off because the harness stopped running keeps the person's
+   message the same way, and ends with the note "interrupted".
+
+### 0.1.0
+
+1. First release.
 
 ## License
 
