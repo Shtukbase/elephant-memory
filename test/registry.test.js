@@ -9,7 +9,7 @@ import { after, test } from 'node:test';
 import { EndlessRefusal } from '../lib/api.js';
 import { resolveConfig } from '../lib/config.js';
 import { Memories } from '../lib/registry.js';
-import { keptLog, rootsForThisFile, settleTicks, wholeTurn } from './fixtures.js';
+import { jobsOf, keptLog, replyTo, rootsForThisFile, settleTicks, wholeTurn } from './fixtures.js';
 import { FakeSession } from './harness-fake.js';
 
 const roots = rootsForThisFile();
@@ -32,7 +32,7 @@ function registry() {
     summarizer: (memoryId, route) => async (turns) => {
       const first = /** @type {{ texts: string[] }} */ (turns[0]);
       calls.push({ memoryId, step: first.texts[1], route: route() });
-      return { text: `S${calls.length}`, message: null };
+      return { text: replyTo(first.texts[1], (k) => `S${calls.length}.${k}`), message: null };
     },
   });
   return { memories, calls };
@@ -133,7 +133,7 @@ test('two chats of one memory interleave whole turns only, in the order they fin
   ]);
   await settleTicks(200);
   assert.equal(memory.view.allBuilt(), true);
-  const compressed = calls.filter((call) => call.step.startsWith('Compaction: compress message'));
+  const compressed = calls.flatMap((call) => jobsOf(call.step)).filter((step) => step.startsWith('Compaction: compress message')).map((step) => ({ step }));
   assert.match(compressed[0].step, /\nin «Release notes», you: beta-question/);
   assert.match(compressed[2].step, /\nin «Pricing page», you: alpha-question/);
   assert.match(compressed[1].step, /\nScout: beta-reply/, 'only the first message of a turn names its chat');

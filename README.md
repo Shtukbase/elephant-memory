@@ -202,6 +202,18 @@ made 2,119 calls, 9.0 a turn against 15.6 before, and cost $1.23 at peak
 summaries cost 0.74 cents at peak and 0.37 cents off-peak, and the writer was
 71% of that.
 
+Each summary call also re-reads about 16k cached tokens: the turn's system
+prompt and tools, then the compaction view. Since 0.2.0 one call writes up to
+six summary lines that are ready at the same time (`writer.batch`, deviation 20
+below). A run measured it on 2026-10-08, 17:51-18:51 UTC. It used the same 235
+scripted turns, the same harness, the same 128,000/64,000-byte view and
+`deepseek-flash` through OpenCode Go, priced at the same DeepSeek list prices.
+The writer made 1,498 calls, 6.4 a turn against 9.0 with 0.1.1, and cost
+$0.995 at peak ($0.50 off-peak) against $1.23. The agent's turns cost $0.47
+($0.24). One turn with its summaries cost 0.62 cents at peak and 0.31 cents
+off-peak, 16% less than with 0.1.1. The writer trimmed 87 lines against 94, and
+all 12 recall checkpoints were answered right in both runs.
+
 A short live check on the same day used this package as published, installed
 from its `.tgz` into a clean harness 0.2.0-rc.2, with `deepseek-flash` through
 OpenCode Go: four Endless chats, six turns. A rule given in the first chat was
@@ -227,6 +239,7 @@ row. A patch replaces a row's whole `config`, so keep every key.
 | `lineBytes` | `512` | The target size of one summary line, in bytes. |
 | `granularity` | `turn` | `turn` keeps one trace message per turn; `step` keeps every tool call and result as its own message (deviation 1). |
 | `writer.model` | `''` | Another model **of the chat's own provider** for writing summaries; empty means the chat's model. A `writer.provider` key is refused. |
+| `writer.batch` | `6` | The most summary lines one call writes when several are ready at once (deviation 20). `1` is one line per call, as before 0.2.0. |
 | `writer.reasoningEffort` | `'off'` | Reasoning effort for summary calls (deviation 13). Empty means `off`. A level the chat's model does not declare falls back to `off`, else the lowest it declares, else none, logged once. |
 | `recallSearch` | `true` | Offer the `recall_search` tool. |
 | `root` | `''` | The folder that holds the memories; empty means `$DSH_HOME/endless`. |
@@ -466,6 +479,46 @@ Each one has a reason the specification does not already answer.
     a `step` entry holds a call without its answer. Other tools' own answers are
     not touched, so an id the harness's own tool prints (`undo-1` from the
     harness's `memory_add`) can still reach a line.
+20. **Several lines per summary call.** The
+    specification writes one line per call. Every call re-reads the turn's
+    system prompt and tools and the compaction view, about 16k cached tokens, so
+    in a 235-turn run the writer was 74% of the bill at 1.97 calls per tree
+    node. Here (`writer.batch`, 6 by default) the nodes the queues make ready at the
+    same moment share one call, up to that many. Usually these are a turn's
+    messages, or the merges one stored call made ready. Only ready nodes go in,
+    so the build order, the 8-unbuilt rule and the views do not change. A node
+    ready alone still gets the one-line call. The call opens with "Compaction:"
+    and the jobs it holds ("compress message 5; merge lines 0+2 and 2+2"), then
+    each job's own task, whole and numbered: its ruler, the language and keep
+    sentences and its `<input>`. Each job aims at 0.75 of the limit (384 bytes
+    at 512), in its ruler, its "at most" and its reply tag
+    (`<line id="n">job n's line, at most 384 bytes</line>`). A line is judged
+    alone, exactly as a one-line try: heads stripped, the CJK guard, and the
+    1.25× tolerance of the true limit. A line that fits is stored at once. A
+    line too long, in an invented script or missing is asked for again alone,
+    in the same conversation, with the per-line feedback ("Too long" with its
+    cut mark at 0.75 of the limit, "Wrong language", or "Missing"). After three
+    tries in all, the shortest valid try is trimmed, as for one line. A call
+    that fails fails each of its lines, and they come back together after 10 s.
+    The context is the longest of the jobs' own contexts, so a merge can see
+    built lines after its own messages; its task still says to use only the
+    facts of its lines and messages. The shared system section still says to
+    output only the line; the batch task, which comes last, asks for the tags.
+    The first design (2026-10-08) asked first tries for the full limit and
+    carried a retry into a new call that did not hold the model's earlier line.
+    In a live run 81% of first tries and 64% of retries came back over 640
+    bytes, and it trimmed 31 lines where one line per call trimmed 6, so it was
+    stopped at turn 27. With the aim at 0.75 and the retry in the same
+    conversation, a run of all 235 scripted turns on the same day measured these
+    numbers (`deepseek-flash` through OpenCode Go, DeepSeek list prices at peak
+    of $0.006 / $0.30 / $1.20 per million cached input, other input and output
+    tokens):
+    - 2.5 lines per batched call.
+    - 30% of first tries over 640 bytes, and 76% of retries then fitting.
+    - 1,498 writer calls against 2,119 for 0.1.1 on the same script.
+    - 87 trimmed lines against 94.
+    - A 19% cheaper writer and a 16% cheaper run.
+    - The same recall: 12 of 12 checkpoints.
 
 ## For hosts
 
@@ -541,6 +594,15 @@ and context owners. A real harness is needed to see anything drawn; see
 the end of [`SEAMS.md`](SEAMS.md).
 
 ## Changelog
+
+### 0.2.0
+
+1. One summary call writes up to six summary lines that are ready at the same
+   time (`writer.batch`, default 6). Each line aims at 0.75 of the limit and is
+   judged alone. A line that does not fit is asked again in the same
+   conversation. Over 235 scripted turns on `deepseek-flash` the writer made
+   29% fewer calls and trimmed fewer lines, and a turn with its summaries cost
+   16% less, with the same recall. Set `writer.batch: 1` for one line per call.
 
 ### 0.1.1
 

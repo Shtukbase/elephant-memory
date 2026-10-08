@@ -35,6 +35,8 @@ mkdir -p "$DSH_HOME" "$TRIAL/documents"
 
 ## 2. Install, the README's way
 
+The plugin's `peerDependencies` accept harness `0.2.1-alpha.1` up to 0.3.
+
 ```sh
 cd "$TRIAL"
 env -u DEEPSEEK_API_KEY dsh plugin --profile web add "$PLUGIN"

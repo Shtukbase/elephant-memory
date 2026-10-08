@@ -4,8 +4,8 @@
 #
 # 1. `preset-endless`: one `@deepseek-ai/dsh-agent-preset` declaration. It is the
 #    harness's Creator mode (the `cordis` preset,
-#    `@deepseek-ai/dsh-web-app/presets/cordis.patch.yml`, read at 0.2.0-rc.2) with
-#    five changes:
+#    `@deepseek-ai/dsh-web-app/presets/cordis.patch.yml`, read at 0.2.1-alpha.1) with
+#    six changes:
 #
 #    a. The `compaction` group is replaced by the `endless` group: this plugin's
 #       compaction service, isolated so it never leaks to other presets. The
@@ -23,6 +23,12 @@
 #    e. No `planning` group (plan mode): its section is the harness's own prompt
 #       policy, whose only authority is the harness's preset file; a copy here
 #       would drift the day it changes.
+#    f. Creator's `time-context` row (new at 0.2.1-alpha.1) is left out. It
+#       appends a timestamped `user/message` to every turn's step, and this
+#       plugin's view would fold those into the remembered history as if the
+#       person had said them; `CONTEXT_KINDS` (lib/context.js) does not know the
+#       kind yet. The reminder tools (`tool-schedule`) and the subagent deny
+#       list that came with it are carried.
 #
 #    To change the plugin's config, restate this whole row (without `insert:`)
 #    in the profile's `cordis.patch.yml`: a patch replaces a row's complete
@@ -69,6 +75,8 @@
               sampleOverCapGlobResults: false
           - id: tool-jobs
             name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-schedule
+            name: '@deepseek-ai/dsh-tool-schedule'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal
@@ -91,6 +99,7 @@
                   writer:
                     model: ''
                     reasoningEffort: 'off'
+                    batch: 6
                   recallSearch: true
                   root: ''
                   contextKinds: []
@@ -111,12 +120,24 @@
                   toolName: subagent
                   modelSelectionSettings: true
                   backgroundMode: continuable
+                  toolFilter:
+                    deny:
+                      - schedule_create
+                      - schedule_delete
+                      - schedule_list
+                      - schedule_update
               - id: tool-subagent-fork
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: fork
                   toolName: subagent_fork
                   backgroundMode: continuable
+                  toolFilter:
+                    deny:
+                      - schedule_create
+                      - schedule_delete
+                      - schedule_list
+                      - schedule_update
               - id: tool-subagent-codex
                 name: '@deepseek-ai/dsh-tool-subagent'
                 disabled: true

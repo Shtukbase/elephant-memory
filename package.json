@@ -1,6 +1,6 @@
 {
   "name": "dsh-elephant-memory",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Elephant Memory: your DeepSeek agent never forgets. An endless memory for the DeepSeek harness: the agent keeps every chat it has in a project and reads all of it at every turn through a fixed-size set of summary lines (after Victor Taelin's OptChat specification).",
   "license": "MIT",
   "author": "Shtukbase",
@@ -55,10 +55,10 @@
   },
   "//peerDependencies": "Every harness package this plugin imports. The harness checks the @deepseek-ai/dsh-* ranges at install and at every start, and resolves the imports to its own installation; profiles set autoInstallPeers: false. They are optional so a workspace install never fetches a second copy (SEAMS.md, item 10-11 of the recheck list).",
   "peerDependencies": {
-    "@deepseek-ai/dsh-compaction": ">=0.2.0-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-home-paths": ">=0.2.0-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-compaction": ">=0.2.1-alpha.1 <0.3.0-0",
+    "@deepseek-ai/dsh-home-paths": ">=0.2.1-alpha.1 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-alpha.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-alpha.1 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "peerDependenciesMeta": {

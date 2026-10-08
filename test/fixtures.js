@@ -131,3 +131,22 @@ export function wholeTurn(session, turn, text, reply) {
   session.append('assistant/message', { turn, step: 1, message: { role: 'assistant', content: [{ type: 'text', text: reply }], source: { kind: 'model' } } }, { surfaceOp: 'append' });
   return session.append('turn/end', { turn, reason: { kind: 'completed' } });
 }
+
+/**
+ * The one-line tasks a writer call carries: its own task, or each job of a
+ * batched call (batch-prompts.js), marker restored.
+ * @param {string} task
+ */
+export function jobsOf(task) {
+  const jobs = [...task.matchAll(/<job id="\d+">\n([\s\S]*?)\n<\/job>/g)].map((match) => `Compaction: ${match[1]}`);
+  return jobs.length > 0 ? jobs : [task];
+}
+
+/**
+ * A reply to a writer call: `line(k)` for its only task, or each job tagged.
+ * @param {string} task @param {(k: number) => string} line
+ */
+export function replyTo(task, line) {
+  const jobs = jobsOf(task);
+  return jobs.length === 1 && jobs[0] === task ? line(0) : jobs.map((_, k) => `<line id="${k + 1}">${line(k)}</line>`).join('\n');
+}

@@ -136,10 +136,10 @@ test('the README opens with the logo, the name and the tagline, and has what a s
 
 test('every configuration key is in the README\'s table, and every deviation the code names is in its list', () => {
   const readme = read('README.md');
-  for (const key of ['agentName', 'you', 'viewBytes', 'viewFloorBytes', 'lineBytes', 'granularity', 'writer.model', 'writer.reasoningEffort', 'recallSearch', 'root', 'contextKinds']) {
+  for (const key of ['agentName', 'you', 'viewBytes', 'viewFloorBytes', 'lineBytes', 'granularity', 'writer.model', 'writer.batch', 'writer.reasoningEffort', 'recallSearch', 'root', 'contextKinds']) {
     assert.match(readme, new RegExp(`\\| \`${key.replace('.', '\\.')}\` \\|`), key);
   }
-  for (const words of ['Three tries, then a trim; a 1.25× tolerance', 'Writer reasoning effort `off`', 'The language guard', '"Compaction:" marker', 'Retries every 10 s']) {
+  for (const words of ['Three tries, then a trim; a 1.25× tolerance', 'Writer reasoning effort `off`', 'The language guard', '"Compaction:" marker', 'Retries every 10 s', 'Several lines per summary call']) {
     assert.ok(readme.includes(words), words);
   }
 });
