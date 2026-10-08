@@ -170,24 +170,37 @@ still marked as usual.
 ## Cost and cache
 
 These numbers come from one measured run: 201 scripted turns on 2026-10-08,
-model `deepseek-flash` on DeepSeek's official API, harness 0.2.0-rc.2. Prices
-were DeepSeek's at the time: $0.028 per million cached input tokens, $0.28 per
-million other input tokens, $0.42 per million output tokens.
+model `deepseek-flash` on DeepSeek's official API, harness 0.2.0-rc.2. The costs
+are that run's token counts at DeepSeek's list prices for `deepseek-flash`, read
+on 2026-10-09 from the
+[pricing page](https://api-docs.deepseek.com/quick_start/pricing). Per million
+tokens at peak: $0.006 for cached input, $0.30 for other input, $1.20 for
+output. Off-peak is half of each: $0.003, $0.15, $0.60. Peak is 01:00-04:00 and
+06:00-10:00 UTC, Monday to Friday, except Chinese public holidays. DeepSeek can
+change these, so read the page again before you rely on them.
 
 | Measure | Result |
 |---|---|
 | Share of each turn's input read from the provider's cache | median **98.4%** (196 ordinary turns, lowest 95.3%) |
 | The one turn right after each merge batch (two in the run) | about **35%** read from cache |
 | Wait before a turn starts (summaries still being written) | median 5.1 s, 90% under 7.5 s |
-| Cost of the agent's turns | $0.74 |
-| Cost of writing summaries (3,133 calls) | $2.08 |
+| Cost of the agent's turns | $0.46 at peak, $0.23 off-peak |
+| Cost of writing summaries (3,133 calls) | $1.50 at peak, $0.75 off-peak |
+| Cost of one turn with its summaries | 0.98 cents at peak, 0.49 cents off-peak |
 | Exact-quote recall questions | 7 of 7 answered word for word |
 
-The summary writer was 74% of the bill. Since that run the writer takes at most
+The summary writer was 76% of the bill. Since that run the writer takes at most
 three tries per line instead of five and accepts a line up to 1.25 times the
 limit (deviation 12 below), and a retry asks for 0.75 of the limit (deviation 16
-below), which should cut its calls; those changes have not been measured over a
-long run yet.
+below), which should cut its calls. A newer run measured them: 235 scripted
+turns on 2026-10-08 with this package as published (0.1.1) in a clean harness
+0.2.0-rc.2, the default 128,000-byte ceiling and 64,000-byte floor, and
+`deepseek-flash` through OpenCode Go. OpenCode Go is a subscription, so its
+costs are the run's token counts at the same DeepSeek list prices. The writer
+made 2,119 calls, 9.0 a turn against 15.6 before, and cost $1.23 at peak
+($0.61 off-peak); the agent's turns cost $0.51 ($0.26). One turn with its
+summaries cost 0.74 cents at peak and 0.37 cents off-peak, and the writer was
+71% of that.
 
 A short live check on the same day used this package as published, installed
 from its `.tgz` into a clean harness 0.2.0-rc.2, with `deepseek-flash` through
