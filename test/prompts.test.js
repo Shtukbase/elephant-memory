@@ -4,12 +4,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolveConfig } from '../lib/config.js';
-import { KEEP, TASK_MARKER, compressTask, mergeTask, retryTask } from '../lib/prompts.js';
+import { DATES, KEEP, TASK_MARKER, compressTask, mergeTask, retryTask } from '../lib/prompts.js';
 import { systemSection } from '../lib/system-section.js';
 
 test('the ruler is exactly the line budget in dashes, and the word count scales with it', () => {
   const task = compressTask(7, 'you: hi', 256);
-  assert.equal(task, `Compaction: compress message 7 into one line of at most 256 bytes\n(about 35 words), the length of this ruler:\n${'-'.repeat(256)}\nWrite the line in the language of the messages it summarizes.\n${KEEP}\n<input>\nyou: hi\n</input>`);
+  assert.equal(task, `Compaction: compress message 7 into one line of at most 256 bytes\n(about 35 words), the length of this ruler:\n${'-'.repeat(256)}\nWrite the line in the language of the messages it summarizes.\n${KEEP}\n${DATES}\n<input>\nyou: hi\n</input>`);
 });
 
 test('the view\'s floor is half its ceiling unless set, and must stay under it', () => {
@@ -46,6 +46,13 @@ test('the system section depends on configuration only', () => {
   assert.ok(systemSection(config).includes('Files are the truth about the current state; your memory is history. The latest\nruling from the person wins.'));
   assert.ok(systemSection(config).includes('recall_search(query)'));
   assert.ok(!systemSection(resolveConfig({ recallSearch: false })).includes('recall_search'));
+});
+
+test('recall guidance limits short answers to recall-only questions and preserves requested work', () => {
+  const section = systemSection(resolveConfig({ autoRecall: true, lookBackRules: true }));
+  assert.match(section, /For a question only about\nearlier conversation/);
+  assert.match(section, /When the person requests work as well as recall, complete that work with the\nappropriate tools and check the current files/);
+  assert.doesNotMatch(section, /no look-back call and no other tool/);
 });
 
 // Live trial 2026-10-08: the gist's "You keep no memory between turns" made the
@@ -123,4 +130,28 @@ test('both writer tasks ask to keep every rule, instruction, decision and prefer
     assert.ok(task.indexOf(KEEP) > 0 && task.indexOf(KEEP) < task.indexOf('<input>'), `${name} task lacks the keep sentence before its input`);
     assert.equal(task.split(KEEP).length - 1, 1, `${name} task repeats the keep sentence`);
   }
+});
+
+// Lite run 1 on 2026-10-09 (probe LP06): "we keep the fallback; confirmed this morning, March 3rd"
+// reached the view without its date, so "when did we decide" had no answer in the line.
+test('both writer tasks ask to keep each decision\'s date, and a merge to keep the dates of both its lines or the latest, marked', () => {
+  assert.match(DATES, /Keep each decision, rule or change with its date/);
+  assert.match(DATES, /when lines merge, keep the date of every decision they hold/);
+  assert.match(DATES, /the latest one, marked "latest"/);
+  const tasks = {
+    compress: compressTask(3, 'you: A', 512),
+    merge: mergeTask({ a: '0+1', b: '1+1', id: 0, end: 1, lineA: '0+1|A', lineB: '1+1|B' }, 512),
+  };
+  for (const [name, task] of Object.entries(tasks)) {
+    assert.ok(task.indexOf(DATES) > task.indexOf(KEEP) && task.indexOf(DATES) < task.indexOf('<input>'), `${name} task lacks the dates sentence after KEEP and before its input`);
+    assert.equal(task.split(DATES).length - 1, 1, `${name} task repeats the dates sentence`);
+  }
+  assert.match(systemSection(resolveConfig({})), /Copy names, numbers,\ndates, ids, paths and errors exactly, and keep each decision's date with it\./);
+});
+
+// Lite run 1 on 2026-10-09 (probe LP13): the agent acted on a remembered ruling that a teammate's
+// later commit had changed; the notes arm, told to read `git log`, did not.
+test('the system section tells the agent to check git log and git status before acting on memory, and that the repository wins', () => {
+  const section = systemSection(resolveConfig({}));
+  assert.ok(section.includes('Before you act on a remembered decision or a\nremembered fact about files, check `git log` and `git status`: the files may\nhave changed since. If the repository disagrees with your memory, the\nrepository wins; say so.'));
 });

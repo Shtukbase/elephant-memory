@@ -1,5 +1,32 @@
 # The harness seams Elephant Memory uses, read from the harness source
 
+## Continuation check: 2026-10-11
+
+The historical source reading below targets 0.2.0-rc.2. The current peer floor
+is 0.2.1-alpha.1. The continuation used that existing harness installation
+with Node 25.2.1 for real reply and browser checks. The standalone CI matrix
+checks the declared peer floor with Node 22 and 24; a configured workflow is
+not evidence that those remote jobs have passed.
+
+Ranked recall uses the current turn's agent route and cancellation signal.
+It freezes the memory prefix before awaiting query expansion. An expansion
+failure falls back to the original query; cancellation prevents publication
+and aborts the provider stream. Runtime instructions and normal coding tools
+remain available. Historical messages are source material, not new commands.
+
+The optional decision journal reads only finished spoken turns. A single
+background writer publishes source-hashed, predecessor-linked batches only
+after a durable write. Reload discards an invalid cache suffix in memory.
+Closing the writer prevents late publication. The rendered journal is bounded;
+its rebuildable cache grows with history. Source validation is not a guarantee
+of semantic accuracy, and neither a static research journal nor a settled
+backfill proves continuous-arrival lag or installed-host behavior.
+
+Four real DeepSeek turns verified cross-chat auto-recall, a standing-rule
+reversal and a requested file write. A separate real-harness browser fixture
+executed manual recall and checked opening, closing and reload with synthetic
+source/provider data. These do not certify the installed Shtukbase History UI.
+
 Read 2026-10-08, before any engine code was written; sections h–k were read
 the same day for memory per agent and project. Every answer below cites
 the installed JavaScript (or, where the installed package ships no `.d.ts`, the

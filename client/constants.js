@@ -13,7 +13,7 @@ const TAB_KIND = 'memory-history';
 /** The endpoint prefix of the server's page reads (lib/browser-routes.js). */
 const UI_PREFIX = 'endless-ui.';
 /** The memory's own tools, whose calls read as a look-back. */
-const LOOK_BACK_TOOLS = ['zoom', 'date', 'recall_search'];
+const LOOK_BACK_TOOLS = ['zoom', 'date', 'recall_search', 'recall'];
 /** The harness's keyed seats this half draws into. */
 const TOOL_SEAT = 'tool.call.toolview';
 const CHAT_NODE_SEAT = 'conversation.chat.node';

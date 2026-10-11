@@ -27,6 +27,7 @@ function engineOver(memory, log) {
   engine.log = log;
   engine.kinds = CONTEXT_KINDS;
   engine.guard = { allows: async () => true };
+  engine.shown = new Map();
   engine.memories = { attach: () => memory, noteRoute: () => {} };
   return engine;
 }
@@ -139,6 +140,27 @@ test('the route a turn notes lets the writer read that chat\'s own system prompt
   assert.equal(noted.length, 1);
   assert.equal(noted[0].sessionId, 'chat-p');
   assert.deepEqual(noted[0].prefix(), { system, tools, toolHistory: { tools: [], updates: [] } });
+});
+
+test('query expansion keeps the current turn account even when a sibling notes another route during the chain', async () => {
+  const { agent, session } = agentOf('query-chat');
+  const entries = Array.from({ length: 30 }, (_, i) => ({ kind: 'user', text: i ? `Weather ${i}` : 'Walrus quota: seventeen crates.', time: 0, record: i }));
+  const memory = { ...memoryOf(entries.length, true), config: resolveConfig({}), entry: (i) => entries[i], tree: {} };
+  const engine = engineOver(memory, keptLog());
+  engine.memories.get = () => memory;
+  let shared = agent.options;
+  engine.memories.routeOf = () => shared;
+  engine.expand = async (_memory, _id, _text, _signal, route) => {
+    assert.equal(shared.provider, 'sibling-account');
+    assert.deepEqual(route, { provider: 'local', model: 'deepseek-flash' });
+    return 'walrus quota crates';
+  };
+  const message = userMessage('What was the walrus quota?', { kind: 'user' });
+  const answer = await engine.preStep({ agent, messages: [message], turn: 1, step: 1, signal: new AbortController().signal }, async () => {
+    shared = { provider: 'sibling-account', model: 'other' };
+    return { kind: 'enter', messages: [message] };
+  });
+  assert.ok(answer.messages.some((item) => item.source?.kind === 'endless-recall'));
 });
 
 // Round 4 live walk, F2: after a switch in the composer, the writer kept

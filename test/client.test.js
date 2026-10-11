@@ -34,10 +34,10 @@ test('the bundle registers under the package\'s name and asks the harness only f
   assert.equal(typeof exported.apply, 'function');
 });
 
-test('it seats the three look-back rows, one quiet compaction, the History tab and the /history command', () => {
+test('it seats four look-back rows, one quiet compaction, the History tab and the /history command', () => {
   const { registered, tabTypes, commands, bundle } = applied();
   const seats = registered.map((r) => `${r.seat}:${r.options.key}`);
-  assert.deepEqual(seats.filter((s) => s.startsWith('tool.call.toolview')), ['tool.call.toolview:zoom', 'tool.call.toolview:date', 'tool.call.toolview:recall_search']);
+  assert.deepEqual(seats.filter((s) => s.startsWith('tool.call.toolview')), ['tool.call.toolview:zoom', 'tool.call.toolview:date', 'tool.call.toolview:recall_search', 'tool.call.toolview:recall']);
   const quiet = registered.find((r) => r.seat === 'conversation.chat.node');
   assert.deepEqual([quiet.options.key, quiet.options.priority, quiet.options.locale], ['compaction', -2, 'chat']);
   assert.deepEqual(seats.filter((s) => s.startsWith('sidebar.right')), [`sidebar.right.pane.tab:${ID}`, `sidebar.right.pane.tab.title:${ID}`]);
@@ -55,7 +55,7 @@ test('/history opens the History tab of the sidebar; a harness without the comma
   assert.deepEqual(opened, ['memory-history']);
   const bare = applied({ services: { commandUi: null, sidebarRightTabs: null } });
   assert.deepEqual([bare.commands.length, bare.tabTypes.length], [0, 0]);
-  assert.equal(bare.registered.filter((r) => r.seat === 'tool.call.toolview').length, 3);
+  assert.equal(bare.registered.filter((r) => r.seat === 'tool.call.toolview').length, 4);
 });
 
 test('a command name that is already taken is logged, not thrown, and the tab stays open-able from the sidebar', () => {

@@ -101,6 +101,13 @@
                     reasoningEffort: 'off'
                     batch: 6
                   recallSearch: true
+                  recall: true
+                  autoRecall: true
+                  lineTools: true
+                  recallMost: 20
+                  lookBackRules: true
+                  ledger: true
+                  ledgerBytes: 16000
                   root: ''
                   contextKinds: []
           - id: delegation

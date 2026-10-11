@@ -81,7 +81,7 @@ test('package.json is ready for a package of its own: licence, repository, keywo
   assert.equal(manifest.bugs.url, 'https://github.com/Shtukbase/elephant-memory/issues');
   for (const word of ['deepseek', 'deepseek-harness', 'dsh-plugin', 'memory']) assert.ok(manifest.keywords.includes(word), word);
   assert.equal(manifest.engines.node, '>=22');
-  assert.match(manifest.engines.dsh, /0\.2\.0-rc\.2 <0\.3\.0-0/);
+  assert.equal(manifest.engines.dsh, manifest.peerDependencies['@deepseek-ai/dsh-compaction']);
   assert.equal(manifest.exports['./client'], './lib/client.js');
   assert.deepEqual({ ...manifest.dsh.client }, { platform: 'web', inject: [] });
   assert.deepEqual([...manifest.dsh.bundle.patch], ['./presets/endless.patch.yml']);
@@ -112,6 +112,10 @@ test('the CI workflow travels with the package: Node 22 and 24, a read-only toke
   assert.match(workflow, /permissions:\n {2}contents: read\n/);
   assert.match(workflow, /node --test --test-timeout=20000 --test-force-exit test\/\*\.test\.js/);
   assert.match(workflow, /node scripts\/build-client\.js --check/);
+  for (const [name, range] of Object.entries(manifest.peerDependencies).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'))) {
+    const floor = /^>=(\S+)/.exec(range)?.[1];
+    assert.ok(floor && workflow.includes(`${name}@${floor}`), `${name} CI does not test its declared floor`);
+  }
   assert.doesNotMatch(workflow, /npm publish|pnpm publish/);
 });
 
@@ -124,8 +128,10 @@ test('nothing published points at a machine: no home folder, no local path, no p
 test('the README opens with the logo, the name and the tagline, and has what a stranger needs', () => {
   const readme = read('README.md');
   assert.match(readme, /^<img src="assets\/elephant\.png" width="128" alt="Elephant Memory">\n/);
+  assert.ok(readme.includes(`git clone --branch v${manifest.version} --depth 1`), 'source installation names this exact version');
+  assert.ok(readme.includes(`## Version ${manifest.version}`), 'release notes match the package version');
   assert.match(readme, /^# Elephant Memory\n/m);
-  assert.match(readme, /Your DeepSeek agent never forgets/);
+  assert.match(readme, /Your DeepSeek agent can look back across its chats/);
   for (const needle of ['## Install', 'dsh plugin --profile web add dsh-elephant-memory', '## Choose the Endless preset', '## How memory is keyed', '## History', '## Looking back', '## Cost and cache', '## Configuration', '## Limitations', '## How it works', '### Deviations from the specification', '## Contributing', '## License', 'github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449', 'github.com/Shtukbase/elephant-memory']) {
     assert.ok(readme.includes(needle), needle);
   }
@@ -136,7 +142,7 @@ test('the README opens with the logo, the name and the tagline, and has what a s
 
 test('every configuration key is in the README\'s table, and every deviation the code names is in its list', () => {
   const readme = read('README.md');
-  for (const key of ['agentName', 'you', 'viewBytes', 'viewFloorBytes', 'lineBytes', 'granularity', 'writer.model', 'writer.batch', 'writer.reasoningEffort', 'recallSearch', 'root', 'contextKinds']) {
+  for (const key of ['agentName', 'you', 'viewBytes', 'viewFloorBytes', 'lineBytes', 'granularity', 'writer.model', 'writer.batch', 'writer.reasoningEffort', 'recallSearch', 'recall', 'autoRecall', 'lineTools', 'recallMost', 'lookBackRules', 'ledger', 'ledgerBytes', 'root', 'contextKinds']) {
     assert.match(readme, new RegExp(`\\| \`${key.replace('.', '\\.')}\` \\|`), key);
   }
   for (const words of ['Three tries, then a trim; a 1.25× tolerance', 'Writer reasoning effort `off`', 'The language guard', '"Compaction:" marker', 'Retries every 10 s', 'Several lines per summary call']) {

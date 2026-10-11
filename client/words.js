@@ -16,7 +16,7 @@ const FIND_FIELDS = /(^|\s)\d+\|[^|\n]{1,200}\|([A-Za-z]{2,4}\.?, \d{1,2} [A-Za-
 /** A call written inline, `did: name {json}`, and the `result:` that may follow it. */
 const INLINE_CALL = /(?:did:\s*)+([a-z][a-z0-9_]*)(?:\s*(\{[^{}]*\}))?(\s+result:)?/g;
 /** The sentences the tools answer when they found nothing (lib/recall.js, lib/tools.js). */
-const NOT_REMEMBERED = /^(No line |No message |This conversation has no endless memory|The search needs words|No message contains|That pattern is not)/;
+const NOT_REMEMBERED = /^(No line |No message |No further passage |This conversation has no endless memory|The search needs |That pattern is not)/;
 
 /** The plain names of the harness tools a trace usually holds; any other is its own name spaced out. */
 const TOOL_NAMES = {
@@ -79,6 +79,12 @@ function lookedBackAt(toolName, args, output) {
     const first = (text.split('\n')[0] || '').split('|');
     return { subject: clipped(query, 60), chat: '', date: first.length >= 4 ? clipped(first[2] || '', 40) : '' };
   }
+  if (toolName === 'recall') {
+    const query = args !== null && typeof args.question === 'string' ? args.question.trim() : '';
+    const header = text.split('\n').find((line) => line.startsWith('--- ')) ?? '';
+    const chat = (/in «([^»]+)»/.exec(header) || [])[1] || '';
+    return { subject: clipped(query, 60), chat: clipped(chat, 60), date: clipped(header.replace(/^--- /, '').split(', in «')[0], 40) };
+  }
   const line = text.split('\n')[0] || '';
   const single = /^\d+\+0\|/.test(line);
   let words = line.replace(LINE_ID, '');
@@ -121,6 +127,7 @@ function plainFinds(answer) {
  * @param {string} toolName @param {string} output
  */
 function plainLookBack(toolName, output) {
+  if (toolName === 'recall') return output.split('\n').slice(1).map((line) => plainInline(line.replace(/^\d+\|[^|\n]+\|/, ''))).join('\n');
   return toolName === 'recall_search' ? plainFinds(output) : withoutLineIds(output);
 }
 

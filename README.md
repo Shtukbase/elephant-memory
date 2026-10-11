@@ -2,7 +2,7 @@
 
 # Elephant Memory
 
-**Your DeepSeek agent never forgets.**
+**Your DeepSeek agent can look back across its chats.**
 
 [![npm](https://img.shields.io/npm/v/dsh-elephant-memory)](https://www.npmjs.com/package/dsh-elephant-memory)
 [![test](https://github.com/Shtukbase/elephant-memory/actions/workflows/test.yml/badge.svg)](https://github.com/Shtukbase/elephant-memory/actions/workflows/test.yml)
@@ -12,8 +12,46 @@
 
 Elephant Memory is a plugin for the [DeepSeek harness](https://github.com/deepseek-ai/deepseek-harness)
 (`dsh`). Every chat you have in a folder becomes one long memory: each new turn
-starts with a short, fixed-size summary of everything said before, and the agent
-can open any summary line down to the exact words.
+starts with a bounded summary of earlier turns, matching source passages and a
+dated decision journal. The agent can open any summary line down to the exact
+words. Keeping history does not guarantee that a model finds or uses every fact.
+
+## Ranked recall and the decision journal
+
+The Endless preset retains the ordinary coding tools and all earlier look-back
+tools. It adds `recall(question)`, a ranked search over spoken messages, with
+short query expansion on the conversation's own model and account. Expansion
+has a six-second deadline; failure leaves the original query usable. It never
+searches another project's memory.
+
+Before a turn's first model request, automatic recall can add up to twenty
+passages, within a 40,000-byte content budget plus framing. Passages follow the
+summary view, not the standing context. Irrelevant messages add no block. Manual
+recall freezes its sources before expansion and forwards cancellation to the
+model request. Raw `recall_search` and `zoom` remain available for tool traces,
+which ranked recall deliberately excludes.
+
+The preset also extracts decisions, rules, reversals and open work from finished
+spoken turns in the background. Four turns, or 16,000 characters of split long
+messages, form one extraction window. Each saved batch binds its exact source
+and predecessor; a changed source invalidates its dependent cache. A failed
+write advances nothing. A restart resumes saved progress. There is no bundled
+conversation or static research journal.
+
+The request's journal is limited to 16,000 bytes. Its cache can grow with the
+history. It is derived history, not new instructions or current repository
+state; it may lag behind incoming turns. Summaries must be ready before a turn
+starts, but a journal still being written does not hold that turn. Recall-only
+answers use memory; a request to change files still requires the normal work.
+The journal is model-written: valid source references do not guarantee its
+paraphrases or speaker attribution. Look back at exact words when accuracy
+matters; a source hash alone does not establish semantic support.
+
+For custom hosts, `ledger` is off until explicitly enabled. The preset enables
+`ledger`, `lookBackRules`, `recall`, `autoRecall` and `lineTools`. A host can turn
+off automatic passages with `autoRecall: false`, or journal extraction with
+`ledger: false`. `recallMost` accepts 1–50; `ledgerBytes` accepts 512–64,000.
+No three-step cap or tool-free answer mode is imposed on coding sessions.
 
 It is an independent implementation of Victor Taelin's
 [UniiChat specification](https://gist.github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449)
@@ -22,15 +60,28 @@ It is an independent implementation of Victor Taelin's
 
 ## Install
 
-You need Node 22 or newer, `pnpm` on your `PATH` (the harness's plugin command
-runs it), and the harness CLI at version **0.2.x** (`npm install -g @deepseek-ai/dsh`).
+The source release is **0.3.0**. Install that exact version from its tag; the
+npm registry version can lag behind the source release:
+
+```sh
+git clone --branch v0.3.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git elephant-memory
+dsh plugin --profile web add ./elephant-memory
+```
+
+The registry command, `dsh plugin --profile web add dsh-elephant-memory`, installs
+the version currently published there, not necessarily this source release.
+
+The plugin supports Node 22 or newer; the acceptance runs used Node 25.2.1.
+Use that runtime for the current harness CLI: Node 23.10.0 can exit without
+starting it because it lacks `import.meta.main`. You need `pnpm` on your `PATH` (the harness's plugin command
+runs it), and harness **0.2.1-alpha.1 or newer, below 0.3**
+(`npm install -g @deepseek-ai/dsh@0.2.1-alpha.1` installs the tested version).
 
 1. **Add the plugin to a profile.** The web profile is the one `dsh web` starts;
    the command creates it if it does not exist yet:
 
-   ```sh
-   dsh plugin --profile web add dsh-elephant-memory
-   ```
+   Use the source-folder command above for this release, or the registry
+   command for its separately published version.
 
    `add` also takes a folder that holds this package or a `.tgz` made by
    `npm pack`. Because the package ships a bundle patch, `add` also turns that
@@ -39,6 +90,16 @@ runs it), and the harness CLI at version **0.2.x** (`npm install -g @deepseek-ai
 
 2. **Start, or restart, the harness:** `dsh web`. It prints the address of its
    page; open it in a browser.
+
+## Version 0.3.0
+
+Ranked recall and automatic source passages complement the existing summary,
+raw search and zoom tools. Query expansion is bounded and keeps the original
+query on failure. The Endless preset enables a bounded decision journal with
+durable progress, restart recovery and source-change invalidation. Ordinary
+coding tools remain available; the plugin does not set an effort or call cap.
+Manual recall has readable transcript rows with opening, closing and reload
+coverage. The supported harness floor is 0.2.1-alpha.1.
 
 ## Choose the Endless preset
 
@@ -70,8 +131,16 @@ replace that with this list, or add the item to the list already there:
 The memory uses the chat's own model: whichever model and provider the session
 runs also write its summaries. When you switch provider or model in the
 composer, the summaries follow at the next turn: the writer uses the route that
-turn's own request uses, not the one the chat was created on. The model's context window must be at least
-65,536 tokens.
+turn's own request uses, not the one the chat was created on. The preset's
+model context window must be at least **122,560 tokens**. Summary-only hosts
+need 65,536; default automatic recall without the journal needs 106,560.
+These conservative floors reserve the configured additions. Smaller models
+run as ordinary chats without reading or writing this memory.
+
+Choose only a reasoning effort the adapter actually declares. The research
+adapter's `medium` setting was cheaper than its `high` setting in the recall
+grid. The official DeepSeek adapter declares `off`, `low`, `high` and `max`,
+not `medium`; this plugin does not invent that level or change the chat's effort.
 
 1. **DeepSeek's official API** works out of the box: give the harness your key
    in its page's "Add an API key" dialog, or set `DEEPSEEK_API_KEY` before
@@ -154,13 +223,15 @@ ends with a note that it was interrupted.
 
 ## Looking back
 
-The agent has three tools for its memory:
+The agent has four tools for its memory:
 
 1. `zoom(id, n)` opens one summary line into the two lines it was made from;
    `zoom(id, 1)` gives one message whole.
 2. `date(id)` gives the date and time of a message.
 3. `recall_search(query)` searches every message ever written, word for word,
    for a phrase (any case) or a `/regular expression/`. It returns up to 20 hits.
+4. `recall(question)` ranks spoken source passages, expands a short query on
+   the chosen route and returns dated words, not a newly generated answer.
 
 In the transcript each call shows as one row, *Looked back · «what» · date ·
 in «chat»*, which opens to the answer. A memory turn is not marked "Context
@@ -242,6 +313,13 @@ row. A patch replaces a row's whole `config`, so keep every key.
 | `writer.batch` | `6` | The most summary lines one call writes when several are ready at once (deviation 20). `1` is one line per call, as before 0.2.0. |
 | `writer.reasoningEffort` | `'off'` | Reasoning effort for summary calls (deviation 13). Empty means `off`. A level the chat's model does not declare falls back to `off`, else the lowest it declares, else none, logged once. |
 | `recallSearch` | `true` | Offer the `recall_search` tool. |
+| `recall` | `true` | Offer ranked `recall(question)` over spoken source messages. |
+| `autoRecall` | `true` | Search before the first model step; changes the context floor. |
+| `lineTools` | `true` | Retain `zoom`, `date` and raw search, including traces. |
+| `recallMost` | `20` | Maximum ranked passages, 1–50; each reserves 2,000 bytes. |
+| `lookBackRules` | `false` | Scope direct-answer guidance to recall-only questions; the preset enables it. |
+| `ledger` | `false` | Extract the dated journal in the background; the preset enables it. |
+| `ledgerBytes` | `16000` | Request journal budget, 512–64,000 bytes; changes the context floor. |
 | `root` | `''` | The folder that holds the memories; empty means `$DSH_HOME/endless`. |
 | `contextKinds` | `[]` | Message kinds of a host's own standing context, kept in front of the summary like the harness's own context messages. |
 
@@ -263,14 +341,17 @@ place of** its `compaction` group (a preset has one compaction service):
 
 ## Limitations
 
-1. **Small models.** Below a 65,536-token context window a turn runs as an
+1. **Small models.** Below the configured context floor a turn runs as an
    ordinary chat, and the log says so once. DeepSeek's official models are far
    above it.
 2. **It spends tokens.** Summaries are written in the background by the chat's
-   own model on the chat's own provider, never another one. Every writer call is
+   own model on the chat's own provider, never another one. Query expansion and
+   the journal spend tokens too. Every writer call is
    logged and totalled in the memory's `usage.jsonl`.
-3. **One cache miss per batch.** The first turn after a merge batch misses the
-   cache from the first merged line on. That is the cost of the design.
+3. **Dynamic additions change the cache suffix.** The first turn after a merge
+   batch misses from the first merged line. Journal updates and different recall
+   passages can change later input too. Historical summary-only cache shares
+   above do not guarantee the new preset's share.
 4. **A turn can be refused.** If summary lines are still missing after 180 s,
    the turn ends with one sentence in the chat's refusal line: "The memory of
    earlier messages is not ready yet, so this message will be sent with your
@@ -290,7 +371,8 @@ place of** its `compaction` group (a preset has one compaction service):
    refused while the first one holds the memory.
 8. **English only.** The look-back row and History are drawn in English.
 9. **Tested with one harness and its web UI.** Written and run against
-   `@deepseek-ai/dsh` 0.2.0-rc.2 and the web UI that `dsh web` serves. The memory
+   `@deepseek-ai/dsh` 0.2.1-alpha.1 for ranked recall, with earlier measurements
+   on 0.2.0-rc.2, and the web UI that `dsh web` serves. The memory
    itself works in any profile, but the row, the quiet compaction and History are
    drawn only by the web UI. DSH Desktop loads the same browser bundle but has not
    been tried. Another harness version may need the checks in [`SEAMS.md`](SEAMS.md).
@@ -300,7 +382,9 @@ place of** its `compaction` group (a preset has one compaction service):
     declares it, else for the lowest effort the model declares, else for none
     (deviation 13). To keep summaries cheap on another provider, declare an
     `off` level (see [Set up a model](#set-up-a-model)).
-11. **The agent decides when to look back.** The prompt tells it that a summary
+11. **Retrieval and evidence use can fail.** Automatic passages are search
+    results, not a guarantee that all required words were found. The agent can
+    still look back manually. The prompt tells it that a summary
     line is never anyone's exact words and to open the message before quoting,
     and in the live check it did. Before that sentence was added, the same model
     once quoted a summary line as the person's own words.
@@ -332,10 +416,10 @@ tour.
    its own size: `(T - last) / 2^l`. This reproduces the merge order of Taelin's
    rollback list.
 4. **Each turn starts fresh.** Before a turn's first step, the conversation so
-   far is replaced by one message holding the view, so the request is the system
-   prompt, the tools, the view and the new message. The view changes only at its
-   end between batches, so almost all of every request is read from the
-   provider's prefix cache.
+   far is replaced by a message holding the view and optional journal, followed
+   by matching recalled passages and the new message. The view changes only at
+   its end between batches. Dynamic additions follow that stable prefix; their
+   cache share depends on the provider and run.
 5. **Summaries in order.** Up to 8 summary calls run at once. A message's line
    starts once fewer than 8 lines before it are unwritten; a merge starts once
    both halves exist. Each call sends the chat's own system prompt and tools,
@@ -519,6 +603,20 @@ Each one has a reason the specification does not already answer.
     - 87 trimmed lines against 94.
     - A 19% cheaper writer and a 16% cheaper run.
     - The same recall: 12 of 12 checkpoints.
+21. **Lines keep decision dates, and the repository beats memory.** Lite run 1
+    (2026-10-09) showed two losses. A decision's date, said in the message
+    ("confirmed this morning, March 3rd"), was dropped from its line, so "when
+    did we decide" had no answer. And the agent acted on a remembered ruling
+    that a teammate's later commit had changed. Both tasks now add, after the
+    keep sentence: "Keep each decision, rule or change with its date when the
+    messages give one; when lines merge, keep the date of every decision they
+    hold, or, if space runs short, the latest one, marked "latest"."
+    ([`lib/prompts.js`](lib/prompts.js), `DATES`). The shared instructions
+    copy dates exactly too. The line limit is unchanged, and no code edits a
+    line. The system section adds: before acting on a remembered decision or
+    a remembered fact about files, check `git log` and `git status`; if the
+    repository disagrees with memory, the repository wins, and the agent says
+    so ([`lib/system-section.js`](lib/system-section.js)).
 
 ## For hosts
 
@@ -594,6 +692,13 @@ and context owners. A real harness is needed to see anything drawn; see
 the end of [`SEAMS.md`](SEAMS.md).
 
 ## Changelog
+
+### Unreleased
+
+1. Summary lines keep the date of each decision, and a merge keeps the dates
+   of both its lines, or the latest, marked.
+2. Before acting on a remembered decision or fact about files, the agent checks
+   `git log` and `git status`; the repository wins over memory.
 
 ### 0.2.0
 

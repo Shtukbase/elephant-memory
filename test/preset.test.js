@@ -8,6 +8,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { DEFAULTS } from '../lib/config.js';
+import { registerTools } from '../lib/tools.js';
 
 const preset = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'presets', 'endless.patch.yml'), 'utf8');
 /** The YAML without its comments. */
@@ -27,4 +28,17 @@ test('the preset is `endless`, with the endless group isolated in place of compa
   // Every configuration key of the plugin is restated, so a profile copying the row sees them all.
   for (const key of Object.keys(DEFAULTS)) assert.match(rows, new RegExp(`\\n {18}${key}:`), key);
   assert.match(rows, /\n {18}contextKinds: \[\]\n/);
+});
+
+test('the shipped preset keeps raw trace lookup through registered search and zoom callers', async () => {
+  const config = { ...DEFAULTS, lineTools: /lineTools: true/.test(rows) };
+  const tools = [];
+  const memory = { size: 1, entry: () => ({ kind: 'tool', text: 'compiler receipt: ivory-crane', time: 0 }), tree: {}, config: DEFAULTS };
+  registerTools({ tools: { register: (tool) => tools.push(tool) } }, config, () => memory);
+  const exec = { agent: { session: { id: 'synthetic' } } };
+  const search = tools.find((tool) => tool.name === 'recall_search');
+  const open = tools.find((tool) => tool.name === 'zoom');
+  assert.ok(search && open, 'tool traces need a raw search and a way to open the hit');
+  assert.match(await search.execute({ query: 'ivory-crane' }, exec), /ivory-crane/);
+  assert.match(await open.execute({ id: 0, n: 1 }, exec), /compiler receipt: ivory-crane/);
 });

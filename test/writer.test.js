@@ -6,7 +6,7 @@
 // when none fits; a try in a script its sources do not use is invalid.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KEEP } from '../lib/prompts.js';
+import { DATES, KEEP } from '../lib/prompts.js';
 import { stripHeads } from '../lib/text.js';
 import { PLACEHOLDER, View } from '../lib/view.js';
 import { Writer } from '../lib/writer.js';
@@ -141,6 +141,7 @@ test('the compress task is the spec\'s, with a ruler of the limit in dashes and 
 ${'-'.repeat(512)}
 Write the line in the language of the messages it summarizes.
 ${KEEP}
+${DATES}
 <input>
 Assistant: ${'y'.repeat(700)}
 </input>`);
@@ -163,6 +164,7 @@ test('a merge starts once both halves are built; its task names the lines and it
 ${'-'.repeat(512)}
 Write the line in the language of the messages it summarizes.
 ${KEEP}
+${DATES}
 <chat> may hold their messages, 2 to 3, in more detail: take details
 of them from there too.
 Use only facts present in the lines being merged and in those messages.
@@ -188,6 +190,25 @@ test('a stored tree\'s ready merges are queued when the writer opens', async () 
   await settleTicks();
   assert.equal(calls.length, 1);
   assert.match(calls[0].task, /^Compaction: merge lines 0\+1 and 1\+1/);
+});
+
+// Lite run 1 on 2026-10-09 (probe LP06): a decision's date was lost in a summary line.
+test('a merge of two dated decisions asks to keep both dates, and the merged line is stored with both', async () => {
+  const lineA = `you: 2026-03-03: keep the npx fallback in nlx, the build agents have no pnpm ${'a'.repeat(200)}`;
+  const lineB = `you: 2026-03-10: engines floor stays >=20.19.0 ${'b'.repeat(200)}`;
+  const tree = new MemoryTree().set(0, 0, lineA).set(0, 1, lineB);
+  const { calls, summarize } = heldCalls();
+  const { writer } = writerFor(entriesOf(['a', 'b']), summarize, { tree });
+  writer.pump();
+  await settleTicks();
+  assert.equal(calls.length, 1);
+  const task = calls[0].task;
+  assert.ok(task.includes(DATES), 'the merge task does not ask to keep the dates');
+  assert.ok(task.indexOf(DATES) < task.indexOf(`0+1|${lineA}`), 'the dates sentence comes after the input it applies to');
+  const merged = 'you: 2026-03-03 keep npx fallback in nlx (agents lack pnpm); 2026-03-10 (latest) engines floor >=20.19.0';
+  calls[0].answer(merged);
+  await settleTicks();
+  assert.equal(tree.text(1, 0), merged, 'the merged line lost a date on its way to the tree');
 });
 
 // A 201-turn trial run on 2026-10-08: 3,133 writer calls over 201 turns, mostly "Too long" retries.
