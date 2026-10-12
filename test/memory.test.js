@@ -141,6 +141,32 @@ test('settle waits for the lines, and gives up on timeout, abort or close', asyn
   assert.equal(await closing, false);
 });
 
+test('with a grace, settle lets the turn go on while the unwritten lines are single messages that fit, shown clipped and marked', async () => {
+  const dir = roots.fresh();
+  const { memory } = open(dir, { config: resolveConfig({ settleGraceMs: 20 }), summarize: () => new Promise(() => {}) });
+  memory.appendTurn(record('s1', '', 1, [['user', `${'x'.repeat(5000)}TAILWORD`]]));
+  const started = Date.now();
+  assert.equal(await memory.settle(undefined, 5_000, 20), true);
+  assert.ok(Date.now() - started < 2_000, 'the turn waited out the timeout');
+  assert.equal(await memory.settle(undefined, 40), false, 'without a grace it still waits for every line');
+  const view = memory.render();
+  assert.match(view, /^0\+1\|\(the message itself, not summarized yet\) .*x{100}/m);
+  assert.doesNotMatch(view, /TAILWORD/, 'a raw line was not clipped');
+  assert.ok(Buffer.byteLength(view) < 2_048 + 400);
+  memory.close();
+});
+
+test('with a grace, settle keeps waiting when the unwritten lines are over the raw budget', async () => {
+  const dir = roots.fresh();
+  const { memory } = open(dir, { config: resolveConfig({ settleGraceMs: 10 }), summarize: () => new Promise(() => {}) });
+  memory.appendTurn(record('s1', '', 1, Array.from({ length: 10 }, (_, k) => /** @type {[any, string]} */ (['user', `${k}`.repeat(3000)]))));
+  assert.equal(await memory.settle(undefined, 80, 10), false);
+  assert.doesNotMatch(memory.render(), /message itself/);
+  assert.throws(() => resolveConfig({ settleGraceMs: 60_001 }), /settleGraceMs/);
+  assert.throws(() => resolveConfig({ settleGraceMs: -1 }), /settleGraceMs/);
+  memory.close();
+});
+
 test('the order file holds whole finished turns of every chat, each exactly what its session log gives', () => {
   const dir = roots.fresh();
   const { memory } = open(dir);

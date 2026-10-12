@@ -108,6 +108,7 @@
                   lookBackRules: true
                   ledger: true
                   ledgerBytes: 16000
+                  settleGraceMs: 2000
                   root: ''
                   contextKinds: []
           - id: delegation

@@ -48,7 +48,7 @@ paraphrases or speaker attribution. Look back at exact words when accuracy
 matters; a source hash alone does not establish semantic support.
 
 For custom hosts, `ledger` is off until explicitly enabled. The preset enables
-`ledger`, `lookBackRules`, `recall`, `autoRecall` and `lineTools`. A host can turn
+`ledger`, `lookBackRules`, `recall`, `autoRecall` and `lineTools`, and sets `settleGraceMs: 2000`. A host can turn
 off automatic passages with `autoRecall: false`, or journal extraction with
 `ledger: false`. `recallMost` accepts 1–50; `ledgerBytes` accepts 512–64,000.
 No three-step cap or tool-free answer mode is imposed on coding sessions.
@@ -320,6 +320,7 @@ row. A patch replaces a row's whole `config`, so keep every key.
 | `lookBackRules` | `false` | Scope direct-answer guidance to recall-only questions; the preset enables it. |
 | `ledger` | `false` | Extract the dated journal in the background; the preset enables it. |
 | `ledgerBytes` | `16000` | Request journal budget, 512–64,000 bytes; changes the context floor. |
+| `settleGraceMs` | `0` | How long a turn waits for the summary writer, 0–60,000 ms; the preset uses 2,000. After it, newest lines not yet summarized are shown as the messages themselves, 2,048 bytes each and 16,384 in all; past that the turn keeps waiting. `0` waits for every line. |
 | `root` | `''` | The folder that holds the memories; empty means `$DSH_HOME/endless`. |
 | `contextKinds` | `[]` | Message kinds of a host's own standing context, kept in front of the summary like the harness's own context messages. |
 

@@ -151,7 +151,7 @@ test('query expansion keeps the current turn account even when a sibling notes a
   let shared = agent.options;
   engine.memories.routeOf = () => shared;
   engine.expand = async (_memory, _id, _text, _signal, route) => {
-    assert.equal(shared.provider, 'sibling-account');
+    // The query step starts before the chain runs (it overlaps the writer's settle); the route is still this turn's own.
     assert.deepEqual(route, { provider: 'local', model: 'deepseek-flash' });
     return 'walrus quota crates';
   };
