@@ -14,7 +14,7 @@
 [DeepSeek harness](https://github.com/deepseek-ai/deepseek-harness) 0.2.x:
 `npm install -g @deepseek-ai/dsh@0.2.1-alpha.1`.
 
-1. `git clone --branch v0.3.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git`
+1. `git clone --depth 1 https://github.com/Shtukbase/elephant-memory.git`
 2. `dsh plugin --profile web add ./elephant-memory`
 3. `dsh web`, open the address it prints, and pick **Endless** in the mode list
    of a new conversation before the first message.
