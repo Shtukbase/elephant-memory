@@ -37,6 +37,7 @@
     "presets/endless.patch.yml",
     "assets/elephant.png",
     "README.md",
+    "CHANGELOG.md",
     "SEAMS.md",
     "TRY.md",
     "LICENSE"

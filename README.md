@@ -10,6 +10,34 @@
 ![node >= 22](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
 ![DeepSeek harness 0.2.x](https://img.shields.io/badge/DeepSeek%20harness-0.2.x-4D6BFE)
 
+**Try it in one minute.** You need Node 22 or newer, `pnpm`, and the
+[DeepSeek harness](https://github.com/deepseek-ai/deepseek-harness) 0.2.x:
+`npm install -g @deepseek-ai/dsh@0.2.1-alpha.1`.
+
+1. `git clone --branch v0.3.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git`
+2. `dsh plugin --profile web add ./elephant-memory`
+3. `dsh web`, open the address it prints, and pick **Endless** in the mode list
+   of a new conversation before the first message.
+
+Step 2 ends with `dsh-elephant-memory link:` and the folder's path. Step 3
+prints one line that starts with `dsh web: http://127.0.0.1:`. Chatting needs a
+DeepSeek key ([Set up a model](#set-up-a-model)).
+
+**What it does not do.**
+
+1. It does not claim to make coding better.
+2. Keeping history does not guarantee the model finds or uses every fact.
+3. It spends tokens: summaries, query expansion and the journal are written by
+   your chat's own model.
+4. It keeps every word on your disk, with no "forget this" yet.
+5. It is tried on one harness line (0.2.x) and its web page only.
+
+The full list is [Limitations](#limitations).
+
+[Licence](LICENSE) · [Changelog](CHANGELOG.md) ·
+[How it was measured](#cost-and-cache) ·
+[Report a problem](https://github.com/Shtukbase/elephant-memory/issues)
+
 Elephant Memory is a plugin for the [DeepSeek harness](https://github.com/deepseek-ai/deepseek-harness)
 (`dsh`). Every chat you have in a folder becomes one long memory: each new turn
 starts with a bounded summary of earlier turns, matching source passages and a
@@ -60,16 +88,18 @@ It is an independent implementation of Victor Taelin's
 
 ## Install
 
-The source release is **0.3.0**. Install that exact version from its tag; the
-npm registry version can lag behind the source release:
+Install a release from its tag, as on the first screen. Replace `v0.3.0` with
+the version you want:
 
 ```sh
-git clone --branch v0.3.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git elephant-memory
+git clone --branch v0.3.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git
 dsh plugin --profile web add ./elephant-memory
 ```
 
-The registry command, `dsh plugin --profile web add dsh-elephant-memory`, installs
-the version currently published there, not necessarily this source release.
+The registry copy installs the same release with
+`dsh plugin --profile web add dsh-elephant-memory`; check that the version on
+the [registry page](https://www.npmjs.com/package/dsh-elephant-memory) matches
+the tag you want.
 
 The plugin supports Node 22 or newer; the acceptance runs used Node 25.2.1.
 Use that runtime for the current harness CLI: Node 23.10.0 can exit without
@@ -80,9 +110,6 @@ runs it), and harness **0.2.1-alpha.1 or newer, below 0.3**
 1. **Add the plugin to a profile.** The web profile is the one `dsh web` starts;
    the command creates it if it does not exist yet:
 
-   Use the source-folder command above for this release, or the registry
-   command for its separately published version.
-
    `add` also takes a folder that holds this package or a `.tgz` made by
    `npm pack`. Because the package ships a bundle patch, `add` also turns that
    patch on. The harness checks the package's `peerDependencies` at install and
@@ -90,16 +117,6 @@ runs it), and harness **0.2.1-alpha.1 or newer, below 0.3**
 
 2. **Start, or restart, the harness:** `dsh web`. It prints the address of its
    page; open it in a browser.
-
-## Version 0.3.0
-
-Ranked recall and automatic source passages complement the existing summary,
-raw search and zoom tools. Query expansion is bounded and keeps the original
-query on failure. The Endless preset enables a bounded decision journal with
-durable progress, restart recovery and source-change invalidation. Ordinary
-coding tools remain available; the plugin does not set an effort or call cap.
-Manual recall has readable transcript rows with opening, closing and reload
-coverage. The supported harness floor is 0.2.1-alpha.1.
 
 ## Choose the Endless preset
 
@@ -673,12 +690,19 @@ would differ and lose the cache. With `granularity: step` the file names say
 Issues and pull requests are welcome at
 <https://github.com/Shtukbase/elephant-memory>.
 
+**Source home.** The package folder `packages/dsh-plugin-endless/` in the
+Shtukbase product repository is the one place this code is edited. This
+repository is an export of that folder, never a second place to edit. Pull
+requests are welcome; the maintainers apply an accepted change in the product
+and export it here. The history was scanned for secrets before it was published
+([`docs/history-scan.md`](docs/history-scan.md)).
+
 The package has no dependencies of its own. Its tests import the harness's
 packages, which are peers, so install them first:
 
 ```sh
-npm install --no-save @deepseek-ai/dsh-compaction@0.2.0-rc.2 @deepseek-ai/dsh-home-paths@0.2.0-rc.2 \
-  @deepseek-ai/dsh-llm@0.2.0-rc.2 @deepseek-ai/dsh-tools@0.2.0-rc.2 @deepseek-ai/schemastery@^3.18.4
+npm install --no-save @deepseek-ai/dsh-compaction@0.2.1-alpha.1 @deepseek-ai/dsh-home-paths@0.2.1-alpha.1 \
+  @deepseek-ai/dsh-llm@0.2.1-alpha.1 @deepseek-ai/dsh-tools@0.2.1-alpha.1 @deepseek-ai/schemastery@^3.18.4
 node scripts/build-client.js --check
 node --test --test-timeout=20000 --test-force-exit test/*.test.js
 ```
@@ -693,35 +717,8 @@ the end of [`SEAMS.md`](SEAMS.md).
 
 ## Changelog
 
-### Unreleased
-
-1. Summary lines keep the date of each decision, and a merge keeps the dates
-   of both its lines, or the latest, marked.
-2. Before acting on a remembered decision or fact about files, the agent checks
-   `git log` and `git status`; the repository wins over memory.
-
-### 0.2.0
-
-1. One summary call writes up to six summary lines that are ready at the same
-   time (`writer.batch`, default 6). Each line aims at 0.75 of the limit and is
-   judged alone. A line that does not fit is asked again in the same
-   conversation. Over 235 scripted turns on `deepseek-flash` the writer made
-   29% fewer calls and trimmed fewer lines, and a turn with its summaries cost
-   16% less, with the same recall. Set `writer.batch: 1` for one line per call.
-
-### 0.1.1
-
-1. A turn stopped with Esc is saved to memory: the person's message, what the
-   agent already said, its tool uses with their results so far, and a closing
-   note, "stopped by the person". Before, a turn stopped while it waited for
-   the memory lost the person's message and was not saved at all, and a turn
-   stopped later was saved without saying it had been stopped.
-2. A turn cut off because the harness stopped running keeps the person's
-   message the same way, and ends with the note "interrupted".
-
-### 0.1.0
-
-1. First release.
+See [`CHANGELOG.md`](CHANGELOG.md). Source, registry and changelog carry the same
+version on every release.
 
 ## License
 
