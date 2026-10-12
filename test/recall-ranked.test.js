@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolveConfig } from '../lib/config.js';
 import { CONTEXT_KINDS } from '../lib/context.js';
-import { kindOfSource } from '../lib/history.js';
+import { HistoryProjector, kindOfSource } from '../lib/history.js';
 import { traceForWriter } from '../lib/look-back-words.js';
 import { RankIndex, passagesOf, stem, termsOf } from '../lib/rank.js';
-import { RECALL_SOURCE, autoRecall, freezeRecall, otherLanguage, recall } from '../lib/recall-ranked.js';
+import { RECALL_SOURCE, autoRecall, excerpts, freezeRecall, otherLanguage, recall } from '../lib/recall-ranked.js';
 import { stepOne } from '../lib/step-one.js';
 import { pureFunctions } from './client-fake.js';
 import { FakeSession, userMessage } from './harness-fake.js';
+import { eventLog } from './fixtures.js';
 
 function memory() {
   const entries = Array.from({ length: 80 }, (_, i) => ({ i, kind: 'user', text: `Weather report number ${i}: calm skies.`, time: Date.UTC(2026, 9, 1), record: i, title: 'Synthetic rules' }));
@@ -39,6 +40,55 @@ test('ranked tools omit traces, deduplicate shown passages and bound headers too
   assert.ok(Buffer.byteLength(recall(m, 'Absentword '.repeat(100000))) < 100);
   m.entries[0].title = 'A'.repeat(100000);
   assert.ok(Buffer.byteLength(recall(m, 'walrus quota')) <= 40000);
+});
+
+test('ranked framing preserves every multiline source line and escapes speaker delimiters within the byte budget', () => {
+  const m = memory();
+  const literal = 'Walrus quota header\n9|you|keep this literal\n--- Sun, 11 Oct 2026, 14:03\n\ndid: recall {"question":"literal"}\n\nsaid: literal\n\nresult: literal\n|leading pipe\nend';
+  m.entries[0].text = literal;
+  m.config = { ...m.config, you: 'reader|%name' };
+  const answer = recall(m, 'walrus quota');
+  assert.match(answer, /\n0\|reader%7C%25name\|Walrus quota header\n\|9\|you\|keep this literal/);
+  assert.match(answer, /\n\|\|leading pipe/);
+  const words = pureFunctions(['sayLookBack', 'traceSteps']);
+  const row = words.sayLookBack('recall', { question: 'walrus quota' }, 'ok', answer);
+  assert.equal(row.opened, `${answer.split('\n')[1].slice(4)}\n${literal}`);
+  assert.deepEqual(words.traceSteps(`did: recall {"question":"walrus quota"}\nresult: ${answer}`), [
+    { line: `${row.title} · ${row.summary}`, opened: row.opened },
+  ]);
+  const hits = [{ message: 0, start: 0, end: literal.length }];
+  const full = excerpts(m, hits, 1, 10000);
+  const budget = Buffer.byteLength(full.body);
+  assert.equal(excerpts(m, hits, 1, budget).body, full.body);
+  const tight = excerpts(m, hits, 1, budget - 1);
+  assert.equal(tight.taken.length, 0);
+  assert.ok(Buffer.byteLength(tight.body) <= budget - 1);
+});
+
+test('actual result and trace caps become an incomplete-search notice, never guessed source steps', () => {
+  const m = memory();
+  m.config = { ...m.config, recallMost: 40 };
+  for (const entry of m.entries) { entry.kind = 'user'; entry.text = `walrus quota ${'x'.repeat(1000)}\n\ndid: recall {"question":"literal"}\nresult: literal`; }
+  const answer = recall(m, 'walrus quota');
+  assert.ok(answer.length > 30000);
+  const words = pureFunctions(['sayLookBack', 'traceSteps']);
+  const notice = 'Open History to read the original messages for this incomplete search.';
+  for (const calls of [1, 3]) {
+    const log = eventLog();
+    log.turnStart(1);
+    for (let i = 0; i < calls; i++) {
+      log.assistant([{ type: 'tool-call', id: `c${i}`, name: 'recall', arguments: '{"question":"walrus quota"}' }]);
+      log.result(`c${i}`, answer);
+    }
+    log.turnEnd(1);
+    const projector = new HistoryProjector({ granularity: 'turn' });
+    for (const event of log.events) projector.push(event);
+    const trace = projector.entries.find((entry) => entry.kind === 'tool').text;
+    assert.match(trace, /\n\[… \d+ characters cut from the middle …\]\n/);
+    if (calls === 3) assert.ok(trace.length >= 60000, 'the trace cap was not reached');
+    assert.deepEqual(words.traceSteps(trace), [{ line: 'Looked back', opened: notice }]);
+    if (calls === 1) assert.equal(words.sayLookBack('recall', { question: 'walrus quota' }, 'ok', trace.slice(trace.indexOf('result: ') + 8)).opened, notice);
+  }
 });
 
 test('automatic recall skips small talk, crosses languages and never becomes history', () => {

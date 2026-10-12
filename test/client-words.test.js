@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dateOf, recallSearch, zoom } from '../lib/recall.js';
+import { recall } from '../lib/recall-ranked.js';
 import { longDate } from '../lib/text.js';
 import { pureFunctions } from './client-fake.js';
 import { MemoryTree } from './fixtures.js';
@@ -12,6 +13,23 @@ const words = pureFunctions(['sayLookBack', 'plainInline', 'plainMessage', 'trac
 
 const CONFIG = { agentName: 'Assistant', you: 'you', granularity: 'turn', lineBytes: 512 };
 const DAY = 86_400_000;
+
+test('invalid ranked body grammar and capped traces give a notice rather than guessed source', () => {
+  const answer = recall(memory(), 'release notes');
+  const notice = 'Open History to read the original messages for this incomplete search.';
+  for (const line of ['unframed tail', '4|bad%20speaker|tail', '--- Sun, 11 Oct 2026, 19:16']) {
+    assert.equal(words.sayLookBack('recall', { question: 'release notes' }, 'ok', `${answer}\n${line}`).opened, notice);
+  }
+  const capped = `${answer}\n[… 42 characters cut from the middle …]\n\ndid: recall {"question":"literal"}\nresult: literal`;
+  assert.deepEqual(words.traceSteps(`did: recall {"question":"release notes"}\nresult: ${capped}`), [{ line: 'Looked back', opened: notice }]);
+});
+
+test('legacy ranked results direct the reader to original messages without guessing source or trace boundaries', () => {
+  const answer = '1 best passages of 8 messages. Each group is one turn, oldest first, under its date; each line is id|who|text, word for word, and "[…]" marks text left out.\n--- Sun, 11 Oct 2026, 19:13, in «Launch»\n0|you|Header\n9|you|literal\n\ndid: recall {"question":"literal"}\nresult: literal';
+  const notice = 'Open History to read the original messages for this earlier search.';
+  assert.equal(words.sayLookBack('recall', { question: 'quota' }, 'ok', answer).opened, notice);
+  assert.deepEqual(words.traceSteps(`did: recall {"question":"quota"}\nresult: ${answer}`), [{ line: 'Looked back · «quota»', opened: notice }]);
+});
 
 /** A memory of invented messages, the shape lib/recall.js reads. */
 function memory() {
