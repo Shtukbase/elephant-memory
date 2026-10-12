@@ -81,9 +81,8 @@ function lookedBackAt(toolName, args, output) {
   }
   if (toolName === 'recall') {
     const query = args !== null && typeof args.question === 'string' ? args.question.trim() : '';
-    const header = text.split('\n').find((line) => line.startsWith('--- ')) ?? '';
-    const chat = (/in «([^»]+)»/.exec(header) || [])[1] || '';
-    return { subject: clipped(query, 60), chat: clipped(chat, 60), date: clipped(header.replace(/^--- /, '').split(', in «')[0], 40) };
+    const ranked = rankedLookBack(output);
+    return { subject: clipped(query, 60), chat: clipped(ranked?.chat ?? '', 60), date: ranked?.date ?? '' };
   }
   const line = text.split('\n')[0] || '';
   const single = /^\d+\+0\|/.test(line);
@@ -121,13 +120,34 @@ function plainFinds(answer) {
   return answer.split('\n').map((line) => plainInline(withoutLineIds(line))).join('\n');
 }
 
-/**
- * A look-back answer as a person reads it opened: no line ids, and a search's
- * hits as their date and words.
- * @param {string} toolName @param {string} output
- */
+const LEGACY_RANKED_FORM = /^\d+ best passages of \d+ messages\.(?: Passages already shown in this turn are left out\.)? Each group is one turn, oldest first, under its date; each line is id\|who\|text, word for word, and "\[…\]" marks text left out\.\n(?=--- )/;
+const RANKED_FORM = /^\d+ best passages of \d+ messages\.(?: Passages already shown in this turn are left out\.)? Each group is one turn, oldest first, under its date; each passage starts with id\|who\|text; speaker fields escape % as %25 and \| as %7C; every continuation line starts with one extra \|\. Text is word for word, and "\[…\]" marks text left out\.\n/;
+const EARLIER_RECALL = 'Open History to read the original messages for this earlier search.';
+const INCOMPLETE_RECALL = 'Open History to read the original messages for this incomplete search.';
+const RANKED_GROUP = /^--- ([A-Za-z]{2,4}\.?, \d{1,2} [A-Za-z]{3,5}\.? \d{4}, \d{1,2}:\d{2})(?:, in «(.*)»)?$/;
+
+/** Read only the ranked protocol envelope; source words and their pipes stay literal. @param {string} output */
+function rankedLookBack(output) {
+  if (!RANKED_FORM.test(output)) return null;
+  const lines = output.replace(RANKED_FORM, '').split('\n');
+  const first = RANKED_GROUP.exec(lines[0] ?? '');
+  const incomplete = { date: '', chat: '', text: INCOMPLETE_RECALL };
+  if (first === null) return incomplete;
+  let needsPassage = true;
+  for (const line of lines.slice(1)) {
+    if (/^\d+\|(?:[^%|\n]|%(?:25|7C))+\|/.test(line)) needsPassage = false;
+    else if (!needsPassage && line.startsWith('|')) continue;
+    else if (!needsPassage && RANKED_GROUP.test(line)) needsPassage = true;
+    else return incomplete;
+  }
+  if (needsPassage) return incomplete;
+  return { date: first[1] ?? '', chat: first[2] ?? '', text: lines.map((line) =>
+    line.startsWith('|') ? line.slice(1) : RANKED_GROUP.test(line) ? line.slice(4) : line.replace(/^\d+\|[^|\n]+\|/, '')).join('\n') };
+}
+
+/** A look-back answer as its dates and source words. @param {string} toolName @param {string} output */
 function plainLookBack(toolName, output) {
-  if (toolName === 'recall') return output.split('\n').slice(1).map((line) => plainInline(line.replace(/^\d+\|[^|\n]+\|/, ''))).join('\n');
+  if (toolName === 'recall') return LEGACY_RANKED_FORM.test(output) ? EARLIER_RECALL : rankedLookBack(output)?.text ?? output;
   return toolName === 'recall_search' ? plainFinds(output) : withoutLineIds(output);
 }
 
@@ -170,6 +190,15 @@ function lookBackLine(name, args, answer) {
  * @returns {{ line: string, opened: string }[]}
  */
 function traceSteps(text) {
+  if (/(?:^|\n\n)(?:did:\s*)+recall(?: |\n)/.test(text) && /\n\[… \d+ characters cut from the middle …\]\n/.test(text)) {
+    return [{ line: 'Looked back', opened: INCOMPLETE_RECALL }];
+  }
+  // Old unframed source may contain trace separators too; do not guess any of its boundaries.
+  for (const legacy of text.matchAll(/(?:^|\n\n)((?:did:\s*)+recall [^\n]*)\nresult: ([^\n]*\n--- )/g)) {
+    if (!LEGACY_RANKED_FORM.test(legacy[2] ?? '')) continue;
+    const args = argsOf((legacy[1] ?? '').replace(/^(did:\s*)+recall\s*/, ''));
+    return [{ line: lookBackLine('recall', args, legacy[2] ?? ''), opened: EARLIER_RECALL }];
+  }
   const out = [];
   for (const part of text.split(/\n\n(?=did: |said: |result: )/)) {
     if (part.startsWith('said: ')) { out.push({ line: clipped(part.slice(6), 200), opened: '' }); continue; }
