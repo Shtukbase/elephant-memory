@@ -60,11 +60,11 @@ It is an independent implementation of Victor Taelin's
 
 ## Install
 
-The source release is **0.3.0**. Install that exact version from its tag; the
+The source release is **0.4.0**. Install that exact version from its tag; the
 npm registry version can lag behind the source release:
 
 ```sh
-git clone --branch v0.3.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git elephant-memory
+git clone --branch v0.4.0 --depth 1 https://github.com/Shtukbase/elephant-memory.git elephant-memory
 dsh plugin --profile web add ./elephant-memory
 ```
 
@@ -90,6 +90,16 @@ runs it), and harness **0.2.1-alpha.1 or newer, below 0.3**
 
 2. **Start, or restart, the harness:** `dsh web`. It prints the address of its
    page; open it in a browser.
+
+## Version 0.4.0
+
+The default view is twice the size: `viewBytes` 128,000 becomes 256,000 and
+`viewFloorBytes` 64,000 becomes 128,000. A long chat then spends longer before
+its oldest lines are merged, more of it is read word for word, and the summary
+of the same history is read back more often. The measurement behind the change
+was a live memory of 544 messages, of which the view showed 173 lines; a memory
+already on disk rebuilds to the new ceiling once its view sits under the new
+floor.
 
 ## Version 0.3.0
 
@@ -305,8 +315,8 @@ row. A patch replaces a row's whole `config`, so keep every key.
 |---|---|---|
 | `agentName` | `Assistant` | The name the summary lines give the agent's replies in a chat nobody bound. A bound chat uses the display name its host gave, or a name read from the agent's address (`team/agents/release-captain` gives "Release Captain"). No colon, no line break. |
 | `you` | `you` | The word the summary lines use for the person. |
-| `viewBytes` | `128000` | The summary's ceiling in bytes: once it passes this, one batch of merges brings it down to `viewFloorBytes`. |
-| `viewFloorBytes` | half of `viewBytes` | The floor the batch merges down to (64,000 by default). |
+| `viewBytes` | `256000` | The summary's ceiling in bytes: once it passes this, one batch of merges brings it down to `viewFloorBytes`. |
+| `viewFloorBytes` | half of `viewBytes` | The floor the batch merges down to (128,000 by default). |
 | `lineBytes` | `512` | The target size of one summary line, in bytes. |
 | `granularity` | `turn` | `turn` keeps one trace message per turn; `step` keeps every tool call and result as its own message (deviation 1). |
 | `writer.model` | `''` | Another model **of the chat's own provider** for writing summaries; empty means the chat's model. A `writer.provider` key is refused. |
@@ -411,8 +421,8 @@ tour.
    word.
 3. **The view.** A list of lines that covers the whole history, recent messages
    one per line and older ones many per line. It grows by one line per message.
-   Once it passes 128 KB, one batch merges the most overdue pairs until it is
-   back to 64 KB. A pair's "overdue" score is how long ago it ended, measured in
+   Once it passes 256 KB, one batch merges the most overdue pairs until it is
+   back to 128 KB. A pair's "overdue" score is how long ago it ended, measured in
    its own size: `(T - last) / 2^l`. This reproduces the merge order of Taelin's
    rollback list.
 4. **Each turn starts fresh.** Before a turn's first step, the conversation so

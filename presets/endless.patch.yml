@@ -92,8 +92,8 @@
                 config:
                   agentName: Assistant
                   you: you
-                  viewBytes: 128000
-                  viewFloorBytes: 64000
+                  viewBytes: 256000
+                  viewFloorBytes: 128000
                   lineBytes: 512
                   granularity: turn
                   writer:

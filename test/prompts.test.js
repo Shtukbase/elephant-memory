@@ -13,8 +13,8 @@ test('the ruler is exactly the line budget in dashes, and the word count scales 
 });
 
 test('the view\'s floor is half its ceiling unless set, and must stay under it', () => {
-  assert.equal(resolveConfig({}).viewBytes, 128_000);
-  assert.equal(resolveConfig({}).viewFloorBytes, 64_000);
+  assert.equal(resolveConfig({}).viewBytes, 256_000);
+  assert.equal(resolveConfig({}).viewFloorBytes, 128_000);
   assert.equal(resolveConfig({ viewBytes: 20_000 }).viewFloorBytes, 10_000);
   assert.equal(resolveConfig({ viewBytes: 20_000, viewFloorBytes: 12_000 }).viewFloorBytes, 12_000);
   assert.throws(() => resolveConfig({ viewBytes: 20_000, viewFloorBytes: 20_000 }), /viewFloorBytes/);

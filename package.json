@@ -1,6 +1,6 @@
 {
   "name": "dsh-elephant-memory",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Elephant Memory: source-backed recall across DeepSeek chats, with a bounded summary view, ranked passages and an incremental decision journal (after Victor Taelin's OptChat specification).",
   "license": "MIT",
   "author": "Shtukbase",
